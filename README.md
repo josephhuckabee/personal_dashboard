@@ -1,80 +1,60 @@
-# Joseph OS — AI Chief of Staff
+# You OS — AI Chief of Staff
 
-A private, sign-in-free personal operating system for executing Joseph's Year of Reinvention. Joseph is the CEO; the software acts as Chief of Staff—tracking transformation, detecting risk, forecasting outcomes, and recommending the highest-return actions.
+You OS is a private, user-scoped executive operating system built with Next.js, TypeScript, Tailwind, Supabase, Zod, and OpenAI or Anthropic. Every user receives a personalized `[Preferred Name] OS` while the approved dashboard design remains the default visual system.
 
-Joseph OS also includes:
+## Local setup
 
-- Full wellbeing tracking: wake mood, bedtime mood, sleep, diet, energy, and stress
-- Randomized daily gratitude SMS prompts with long-term memory resurfacing
-- AI-assisted travel screenshot organization for stays, pet sits, transit, and activities
-- Content ideas, production checklists, and contacts/UGC CRM
-- A dedicated WGU school dashboard with courses, tasks, study sessions, and graduation progress
-
-## Executive workspaces
-
-Command Center, Objectives, Habits, Finance, Health, Travel HQ, Content Studio, Relationships, Insights, Chief of Staff, Timeline, and Settings.
-
-The Command Center combines a daily Morning Brief, Life Score, objective health, runway, risks, opportunities, calendar, habits, and Chief of Staff guidance. The system also includes Weekly CEO Reports, completion forecasts, behavioral confidence scores, a transformation timeline, relationship health, and automation previews.
-
-## Run locally
+1. Create a Supabase project.
+2. Run both SQL files in `supabase/migrations/` in filename order, or apply them with the Supabase CLI.
+3. Copy `.env.example` to `.env.local` and fill in the Supabase values.
+4. Add either `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`. Set `AI_PROVIDER` and a compatible `AI_MODEL`.
+5. Install and run:
 
 ```bash
 npm install
-cp .env.example .env
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Data and receipt images stay in the local `data/` directory.
+Open [http://localhost:3000](http://localhost:3000). Email/password authentication protects the application routes. New users are routed through onboarding before entering the dashboard.
 
-## Intelligence setup
-
-Add `OPENAI_API_KEY` to `.env` to enable:
-
-- Automatic reading of receipt photos and screenshots
-- Merchant, total, tax, date, and category extraction
-- Personalized assistant responses
-- Weekly plans informed by Joseph OS history
-
-Without a key, receipt uploads, manual review, budgets, calendar sync, and deterministic weekly planning still work.
-
-## Apple Calendar
-
-Use **Subscribe in Apple Calendar** inside the Assistant section. Joseph OS publishes one live calendar at:
+## Environment variables
 
 ```text
-webcal://YOUR_HOST/calendar/joseph-os.ics
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+OPENAI_API_KEY=
+ANTHROPIC_API_KEY=
+AI_PROVIDER=openai
+AI_MODEL=gpt-4.1
 ```
 
-For syncing away from the home network, deploy Joseph OS at a private HTTPS address and set `PUBLIC_BASE_URL`. Apple Calendar refreshes subscribed calendars automatically across devices signed into the same Apple account.
+`SUPABASE_SERVICE_ROLE_KEY` is server-only and is used by the Chief of Staff aggregation function after the API route verifies the signed-in user. Never expose it to the browser.
 
-## Smart SMS setup
+## Database and privacy
 
-Add the Twilio and phone values from `.env.example`, then set the Twilio number’s incoming-message webhook to:
+The migration creates the requested core tables, auth-profile trigger, indexes, private receipt bucket, update triggers, and row-level security. Every application record has a `user_id`, and all browser/server session queries remain user-scoped. Receipts are private and are exposed to the owner through short-lived signed URLs.
 
-```text
-https://YOUR_PUBLIC_HOST/api/sms/incoming
+## Optional development seed
+
+The development-only seed function is in `supabase/seed.sql`. After creating an auth user, run it explicitly with that user UUID:
+
+```sql
+set app.environment = 'development';
+select public.seed_demo_user('YOUR_AUTH_USER_UUID');
 ```
 
-Joseph OS will:
+It adds Joseph as an explicit demo user with a $12,000 cash account, Seoul chapter, WGU and remote-income objectives, five core habits, and a travel plan. No Joseph-specific data is used by the product runtime, and production never loads seed data.
 
-- Send a Sunday 9 AM planning prompt
-- Turn a `PLAN` reply plus constraints into a weekly calendar
-- Send a Friday budget pulse
-- Send category threshold alerts after tracked receipts
+## AI safety boundary
 
-Twilio webhooks need a publicly reachable HTTPS address; a tunnel works while developing.
+`generateChiefOfStaffDecisionEngine(userId)` reads only the authenticated user's Supabase snapshot, requests strict JSON, validates it with Zod, and stores the result in `ai_decisions`. Missing data remains explicitly missing. Medical, legal, and financial topics are framed as operational guidance, not certainty. If the configured AI provider fails, the server produces a deterministic evidence-only decision.
 
-## Storage and privacy
-
-- No user account or authentication is required during development.
-- Data is persisted in `data/joseph-os.json`.
-- Receipt images are stored in `data/receipts/`.
-- Personal files and `.env` are gitignored.
-- Add authentication before exposing the app directly to the public internet.
-
-## Production
+## Verification
 
 ```bash
+npm run typecheck
 npm run build
-npm start
 ```
+
+Deploy to Vercel after adding the same environment variables and configuring the Supabase authentication redirect URL as `https://YOUR_DOMAIN/auth/callback`.
