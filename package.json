@@ -1,0 +1,26 @@
+{
+  "name": "joseph-os",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "start": "NODE_ENV=production node server.js"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "dotenv": "latest",
+    "express": "latest",
+    "lucide-react": "latest",
+    "multer": "latest",
+    "node-cron": "latest",
+    "openai": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "sharp": "^0.35.2",
+    "twilio": "latest",
+    "vite": "latest"
+  }
+}
