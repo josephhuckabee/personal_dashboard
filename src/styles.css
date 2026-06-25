@@ -269,10 +269,6 @@ body { background: #07101c; }
   .mobile-more-sheet { border-color: rgba(255,255,255,.24); background: linear-gradient(155deg, rgba(42,57,81,.94), rgba(11,25,43,.92)); box-shadow: inset 0 1px 0 rgba(255,255,255,.2), 0 -20px 80px rgba(0,0,0,.5); backdrop-filter: blur(44px) saturate(1.5); }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .liquid-orb { animation: none; }
-}
-
 /* Dark graphite tuning: restrained color, harder contrast, less decorative glass. */
 :root {
   --bg: #05080c;
@@ -388,7 +384,6 @@ body { background: #05080c; }
 .app-shell[data-font="system"] { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
 .app-shell[data-density="compact"] .card { padding: 16px; }
 .app-shell[data-density="compact"] .page-content { gap: 14px; }
-.app-shell[data-motion="reduced"] *, .app-shell[data-motion="reduced"] *::before, .app-shell[data-motion="reduced"] *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
 .checkin-trends { display: grid; gap: 14px; margin-top: 22px; }
 .checkin-trends > div { display: grid; grid-template-columns: 100px 1fr; align-items: center; gap: 16px; text-transform: capitalize; color: var(--muted); font-size: 12px; font-weight: 700; }
 .checkin-ledger button { width: 100%; display: grid; grid-template-columns: 72px 10px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 11px 0; border: 0; border-bottom: 1px solid var(--line); text-align: left; background: transparent; cursor: pointer; }

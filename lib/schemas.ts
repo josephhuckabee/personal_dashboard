@@ -20,7 +20,7 @@ export const entitySchemas = {
   calendar_events: z.object({ title: z.string().trim().min(1).max(250), category: z.string().trim().max(50).optional(), starts_at: z.string().datetime(), ends_at: z.string().datetime(), location: optionalText, notes: optionalText, source: z.string().trim().max(50).optional(), external_id: optionalText }),
   ai_recommendations: z.object({ briefing_id: z.string().uuid().optional().nullable(), title: z.string().trim().min(1).max(200), reason: optionalText, category: optionalText, priority: z.enum(['low', 'medium', 'high']).optional(), recommended_action: z.string().trim().min(1).max(2000), accepted_at: dateString, dismissed_at: dateString }),
   daily_checkins: z.object({ checkin_date: z.string().date().optional(), mood: z.coerce.number().int().min(1).max(5), energy: z.coerce.number().int().min(1).max(5), stress: z.coerce.number().int().min(1).max(5), productivity: z.coerce.number().int().min(1).max(5), sleep_hours: z.coerce.number().min(0).max(24).optional().nullable(), biggest_win: optionalText, biggest_challenge: optionalText, what_was_avoided: optionalText, tomorrow_priority: optionalText, ai_summary: optionalText, notes: optionalText }),
-  user_preferences: z.object({ app_name: optionalText, theme: z.enum(['default', 'midnight', 'soft']).optional(), accent_color: z.string().regex(/^#[0-9a-f]{6}$/i).optional(), font_style: z.enum(['default', 'editorial', 'system']).optional(), density: z.enum(['comfortable', 'compact']).optional(), motion: z.enum(['full', 'reduced']).optional(), chief_of_staff_tone: z.enum(['gentle', 'executive', 'direct']).optional(), design_preferences: z.record(z.unknown()).optional() }),
+  user_preferences: z.object({ app_name: optionalText, theme: z.enum(['default', 'midnight', 'soft']).optional(), accent_color: z.string().regex(/^#[0-9a-f]{6}$/i).optional(), font_style: z.enum(['default', 'editorial', 'system']).optional(), density: z.enum(['comfortable', 'compact']).optional(), chief_of_staff_tone: z.enum(['gentle', 'executive', 'direct']).optional(), design_preferences: z.record(z.unknown()).optional() }),
   finance_categories: z.object({ name: z.string().trim().min(1).max(80), category_type: z.enum(['expense', 'income']), monthly_budget: z.coerce.number().nonnegative().optional().nullable(), color: optionalText }),
 } as const;
 
@@ -54,7 +54,7 @@ export const onboardingSchema = z.object({
   health_baseline: z.object({ weight: z.coerce.number().positive().optional().nullable(), weight_unit: z.string().trim().max(20).default('lb'), average_sleep_hours: z.coerce.number().min(0).max(24).optional().nullable(), workouts_per_week: z.coerce.number().int().min(0).max(14).optional().nullable() }),
   work_style: z.string().trim().min(1).max(1000),
   chief_of_staff_tone: z.enum(['gentle', 'executive', 'direct']),
-  design: z.object({ app_name: z.string().trim().max(100).optional(), theme: z.enum(['default', 'midnight', 'soft']), accent_color: z.string().regex(/^#[0-9a-f]{6}$/i), font_style: z.enum(['default', 'editorial', 'system']), density: z.enum(['comfortable', 'compact']), motion: z.enum(['full', 'reduced']) }),
+  design: z.object({ app_name: z.string().trim().max(100).optional(), theme: z.enum(['default', 'midnight', 'soft']), accent_color: z.string().regex(/^#[0-9a-f]{6}$/i), font_style: z.enum(['default', 'editorial', 'system']), density: z.enum(['comfortable', 'compact']) }),
 });
 
 export const chiefOfStaffDecisionSchema = z.object({

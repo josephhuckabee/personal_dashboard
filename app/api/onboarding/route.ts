@@ -18,6 +18,10 @@ function isMissingRpc(error: { code?: string; message?: string }) {
   return error.code === 'PGRST202' || /Could not find the function public\.complete_onboarding/i.test(error.message || '');
 }
 
+function isMissingTable(error: unknown) {
+  return Boolean(error && typeof error === 'object' && 'code' in error && error.code === 'PGRST205');
+}
+
 async function persistStep<T>(name: string, userId: string, action: () => PromiseLike<{ data: T | null; error: unknown }>) {
   const result = await action();
   if (result.error) {
@@ -30,6 +34,19 @@ async function persistStep<T>(name: string, userId: string, action: () => Promis
 async function completeOnboardingDirect(supabase: SupabaseClient<Database>, userId: string, input: OnboardingInput) {
   const location = input.location || null;
   const currency = input.finances.currency;
+
+  const legacyUser = await supabase.from('users').upsert({
+    id: userId,
+    display_name: input.preferred_name,
+    current_city: location,
+    timezone: input.timezone,
+    one_year_vision: input.one_year_vision,
+    work_style: input.work_style,
+    onboarding_completed: false,
+  } as never, { onConflict: 'id' });
+  if (legacyUser.error && !isMissingTable(legacyUser.error)) {
+    logOnboardingError('legacy users upsert failed', { userId, error: legacyUser.error });
+  }
 
   await persistStep('profiles upsert', userId, () => supabase.from('profiles').upsert({
     user_id: userId,
@@ -49,7 +66,6 @@ async function completeOnboardingDirect(supabase: SupabaseClient<Database>, user
     accent_color: input.design.accent_color,
     font_style: input.design.font_style,
     density: input.design.density,
-    motion: input.design.motion,
     chief_of_staff_tone: input.chief_of_staff_tone,
     design_preferences: input.design as unknown as Json,
   } as never, { onConflict: 'user_id' }));
@@ -136,9 +152,13 @@ async function completeOnboardingDirect(supabase: SupabaseClient<Database>, user
   await persistStep('finance categories insert', userId, () => supabase.from('finance_categories').upsert([
     ['Housing', 'expense'], ['Food', 'expense'], ['Transport', 'expense'], ['Travel', 'expense'], ['Health', 'expense'],
     ['Education', 'expense'], ['Content', 'expense'], ['Other', 'expense'], ['Salary', 'income'], ['Freelance', 'income'],
-  ].map(([name, category_type]) => ({ user_id: userId, name, category_type })) as never, { onConflict: 'user_id,name,category_type', ignoreDuplicates: true }));
+    ].map(([name, category_type]) => ({ user_id: userId, name, category_type })) as never, { onConflict: 'user_id,name,category_type', ignoreDuplicates: true }));
 
   await persistStep('profiles completion update', userId, () => supabase.from('profiles').update({ onboarding_completed: true } as never).eq('user_id', userId));
+  const legacyCompletion = await supabase.from('users').update({ onboarding_completed: true } as never).eq('id', userId);
+  if (legacyCompletion.error && !isMissingTable(legacyCompletion.error)) {
+    logOnboardingError('legacy users completion update failed', { userId, error: legacyCompletion.error });
+  }
 }
 
 export async function POST(request: Request) {
@@ -182,7 +202,8 @@ export async function POST(request: Request) {
             currency: input.finances.currency,
           },
         });
-        return NextResponse.json({ error: FRIENDLY_ERROR }, { status: 500 });
+        console.warn('[onboarding] using direct persistence fallback after rpc failure', { userId, code: error.code });
+        await completeOnboardingDirect(supabase, user.id, input);
       }
     }
 

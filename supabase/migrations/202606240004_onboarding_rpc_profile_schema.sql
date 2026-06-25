@@ -19,9 +19,9 @@ begin
     one_year_vision = excluded.one_year_vision,
     work_style = excluded.work_style;
 
-  insert into public.user_preferences(user_id, app_name, theme, accent_color, font_style, density, motion, chief_of_staff_tone, design_preferences)
-  values (uid, nullif(p_payload #>> '{design,app_name}', ''), p_payload #>> '{design,theme}', p_payload #>> '{design,accent_color}', p_payload #>> '{design,font_style}', p_payload #>> '{design,density}', p_payload #>> '{design,motion}', p_payload->>'chief_of_staff_tone', p_payload->'design')
-  on conflict (user_id) do update set app_name=excluded.app_name, theme=excluded.theme, accent_color=excluded.accent_color, font_style=excluded.font_style, density=excluded.density, motion=excluded.motion, chief_of_staff_tone=excluded.chief_of_staff_tone, design_preferences=excluded.design_preferences;
+  insert into public.user_preferences(user_id, app_name, theme, accent_color, font_style, density, chief_of_staff_tone, design_preferences)
+  values (uid, nullif(p_payload #>> '{design,app_name}', ''), p_payload #>> '{design,theme}', p_payload #>> '{design,accent_color}', p_payload #>> '{design,font_style}', p_payload #>> '{design,density}', p_payload->>'chief_of_staff_tone', p_payload->'design')
+  on conflict (user_id) do update set app_name=excluded.app_name, theme=excluded.theme, accent_color=excluded.accent_color, font_style=excluded.font_style, density=excluded.density, chief_of_staff_tone=excluded.chief_of_staff_tone, design_preferences=excluded.design_preferences;
 
   for item in select value from jsonb_array_elements(coalesce(p_payload->'goals', '[]'::jsonb)) loop
     insert into public.goals(user_id, title, category, target_date) values (uid, item->>'title', coalesce(item->>'category','personal'), nullif(item->>'target_date','')::date);

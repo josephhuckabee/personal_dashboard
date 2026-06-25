@@ -12,12 +12,52 @@ export default function OnboardingPage() {
     preferred_name: '', location: '', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', one_year_vision: '',
     goals: '', habits: '', current_cash: '', monthly_income: '', currency: 'USD', travel_plans: '',
     weight: '', weight_unit: 'lb', average_sleep_hours: '', workouts_per_week: '', work_style: '',
-    chief_of_staff_tone: 'executive', app_name: '', theme: 'default', accent_color: '#a7f3d0', font_style: 'default', density: 'comfortable', motion: 'full',
+    chief_of_staff_tone: 'executive', app_name: '', theme: 'default', accent_color: '#a7f3d0', font_style: 'default', density: 'comfortable',
   });
   const update = (name: string, value: string) => setForm((current) => ({ ...current, [name]: value }));
   const progress = useMemo(() => (step + 1) / steps.length * 100, [step]);
+  const validateStep = (stepToValidate: number) => {
+    if (stepToValidate === 0) {
+      if (!form.preferred_name.trim()) return { valid: false, message: 'Preferred name is required.' };
+      if (!form.timezone.trim()) return { valid: false, message: 'Timezone is required.' };
+      if (form.one_year_vision.trim().length < 10) return { valid: false, message: 'One-year life vision must be at least 10 characters.' };
+    }
+    if (stepToValidate === 1 && !form.goals.trim()) return { valid: false, message: 'Add at least one goal.' };
+    if (stepToValidate === 2) {
+      if (!form.currency.trim()) return { valid: false, message: 'Currency is required.' };
+      if (Number(form.current_cash || 0) < 0) return { valid: false, message: 'Current cash cannot be negative.' };
+      if (Number(form.monthly_income || 0) < 0) return { valid: false, message: 'Monthly income cannot be negative.' };
+    }
+    if (stepToValidate === 3 && !form.work_style.trim()) return { valid: false, message: 'Work style is required.' };
+    return { valid: true, message: '' };
+  };
+
+  function continueToNextStep() {
+    const validation = validateStep(step);
+    const nextStep = Math.min(step + 1, steps.length - 1);
+    console.info('Onboarding Continue clicked', { currentStep: step, validation, formData: form, nextStepTarget: nextStep });
+    if (!validation.valid) {
+      setError(validation.message);
+      return;
+    }
+    setError('');
+    setStep(nextStep);
+  }
+
+  function goBack() {
+    const nextStep = Math.max(step - 1, 0);
+    console.info('Onboarding Back clicked', { currentStep: step, nextStepTarget: nextStep });
+    setError('');
+    setStep(nextStep);
+  }
 
   async function complete() {
+    const validation = validateStep(step);
+    console.info('Onboarding Create my OS clicked', { currentStep: step, validation, formData: form, nextStepTarget: step });
+    if (!validation.valid) {
+      setError(validation.message);
+      return;
+    }
     setLoading(true); setError('');
     const goals = form.goals.split('\n').map((line) => line.trim()).filter(Boolean).map((line) => {
       const [title, category = 'personal', target_date] = line.split('|').map((part) => part.trim());
@@ -35,7 +75,7 @@ export default function OnboardingPage() {
       travel_plans,
       health_baseline: { weight: form.weight ? Number(form.weight) : null, weight_unit: form.weight_unit, average_sleep_hours: form.average_sleep_hours ? Number(form.average_sleep_hours) : null, workouts_per_week: form.workouts_per_week ? Number(form.workouts_per_week) : null },
       work_style: form.work_style, chief_of_staff_tone: form.chief_of_staff_tone,
-      design: { app_name: form.app_name || `${form.preferred_name} OS`, theme: form.theme, accent_color: form.accent_color, font_style: form.font_style, density: form.density, motion: form.motion },
+      design: { app_name: form.app_name || `${form.preferred_name} OS`, theme: form.theme, accent_color: form.accent_color, font_style: form.font_style, density: form.density },
     };
     try {
       const response = await fetch('/api/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -66,10 +106,10 @@ export default function OnboardingPage() {
 
         {step === 2 && <div className="onboarding-fields"><label>Current cash<input type="number" min="0" step=".01" value={form.current_cash} onChange={(event) => update('current_cash', event.target.value)} required /></label><label>Monthly income<input type="number" min="0" step=".01" value={form.monthly_income} onChange={(event) => update('monthly_income', event.target.value)} /></label><label>Currency<input maxLength={3} value={form.currency} onChange={(event) => update('currency', event.target.value)} required /></label><label>Weight<input type="number" min="0" step=".1" value={form.weight} onChange={(event) => update('weight', event.target.value)} /></label><label>Weight unit<select value={form.weight_unit} onChange={(event) => update('weight_unit', event.target.value)}><option value="lb">lb</option><option value="kg">kg</option></select></label><label>Average sleep<input type="number" min="0" max="24" step=".25" value={form.average_sleep_hours} onChange={(event) => update('average_sleep_hours', event.target.value)} /></label><label>Workouts per week<input type="number" min="0" max="14" value={form.workouts_per_week} onChange={(event) => update('workouts_per_week', event.target.value)} /></label></div>}
 
-        {step === 3 && <div className="onboarding-fields"><label className="full-field">Work style<textarea value={form.work_style} onChange={(event) => update('work_style', event.target.value)} placeholder="When do you focus best? How do you prefer to plan and work?" required /></label><label>Chief of Staff tone<select value={form.chief_of_staff_tone} onChange={(event) => update('chief_of_staff_tone', event.target.value)}><option value="gentle">Gentle</option><option value="executive">Executive</option><option value="direct">Direct</option></select></label><label>App name<input value={form.app_name} onChange={(event) => update('app_name', event.target.value)} placeholder={`${form.preferred_name || 'Your Name'} OS`} /></label><label>Theme<select value={form.theme} onChange={(event) => update('theme', event.target.value)}><option value="default">Default</option><option value="midnight">Midnight</option><option value="soft">Soft</option></select></label><label>Accent color<input type="color" value={form.accent_color} onChange={(event) => update('accent_color', event.target.value)} /></label><label>Font style<select value={form.font_style} onChange={(event) => update('font_style', event.target.value)}><option value="default">Default</option><option value="editorial">Editorial</option><option value="system">System</option></select></label><label>Density<select value={form.density} onChange={(event) => update('density', event.target.value)}><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label><label>Motion<select value={form.motion} onChange={(event) => update('motion', event.target.value)}><option value="full">Full</option><option value="reduced">Reduced</option></select></label></div>}
+        {step === 3 && <div className="onboarding-fields"><label className="full-field">Work style<textarea value={form.work_style} onChange={(event) => update('work_style', event.target.value)} placeholder="When do you focus best? How do you prefer to plan and work?" required /></label><label>Chief of Staff tone<select value={form.chief_of_staff_tone} onChange={(event) => update('chief_of_staff_tone', event.target.value)}><option value="gentle">Gentle</option><option value="executive">Executive</option><option value="direct">Direct</option></select></label><label>App name<input value={form.app_name} onChange={(event) => update('app_name', event.target.value)} placeholder={`${form.preferred_name || 'Your Name'} OS`} /></label><label>Theme<select value={form.theme} onChange={(event) => update('theme', event.target.value)}><option value="default">Default</option><option value="midnight">Midnight</option><option value="soft">Soft</option></select></label><label>Accent color<input type="color" value={form.accent_color} onChange={(event) => update('accent_color', event.target.value)} /></label><label>Font style<select value={form.font_style} onChange={(event) => update('font_style', event.target.value)}><option value="default">Default</option><option value="editorial">Editorial</option><option value="system">System</option></select></label><label>Density<select value={form.density} onChange={(event) => update('density', event.target.value)}><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label></div>}
 
         {error && <p className="system-notice">{error}</p>}
-        <div className="onboarding-actions">{step > 0 && <button className="subtle-button" onClick={() => setStep((value) => value - 1)}>Back</button>}<button className="primary-button" disabled={loading || (step === 0 && (!form.preferred_name || form.one_year_vision.length < 10)) || (step === 1 && !form.goals.trim()) || (step === 3 && !form.work_style.trim())} onClick={() => step === steps.length - 1 ? complete() : setStep((value) => value + 1)}>{loading ? 'Building your OS…' : step === steps.length - 1 ? 'Create my OS' : 'Continue'}</button></div>
+        <div className="onboarding-actions">{step > 0 && <button type="button" className="subtle-button" onClick={goBack}>Back</button>}<button type="button" className="primary-button" disabled={loading} onClick={() => step === steps.length - 1 ? complete() : continueToNextStep()}>{loading ? 'Building your OS…' : step === steps.length - 1 ? 'Create my OS' : 'Continue'}</button></div>
       </section>
     </main>
   );
