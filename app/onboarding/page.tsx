@@ -37,10 +37,21 @@ export default function OnboardingPage() {
       work_style: form.work_style, chief_of_staff_tone: form.chief_of_staff_tone,
       design: { app_name: form.app_name || `${form.preferred_name} OS`, theme: form.theme, accent_color: form.accent_color, font_style: form.font_style, density: form.density, motion: form.motion },
     };
-    const response = await fetch('/api/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    const result = await response.json();
-    if (!response.ok) { setError(result.error || 'Onboarding failed.'); setLoading(false); return; }
-    window.location.href = '/';
+    try {
+      const response = await fetch('/api/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        console.error('Onboarding submit failed', { status: response.status, error: result.error, issues: result.issues });
+        setError(result.error || "We couldn't save your setup yet. Please try again in a moment.");
+        setLoading(false);
+        return;
+      }
+      window.location.href = '/';
+    } catch (error) {
+      console.error('Onboarding submit failed', error);
+      setError("We couldn't reach the server. Check your connection and try again.");
+      setLoading(false);
+    }
   }
 
   return (

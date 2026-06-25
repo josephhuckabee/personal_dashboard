@@ -1,15 +1,232 @@
 import { NextResponse } from 'next/server';
-import { requireUser } from '@/lib/auth';
-import { apiError } from '@/lib/api';
+import { UnauthorizedError, requireUser } from '@/lib/auth';
 import { onboardingSchema } from '@/lib/schemas';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@/lib/supabase/database.types';
 import type { Json } from '@/lib/supabase/database.types';
+import { ZodError } from 'zod';
+
+const FRIENDLY_ERROR = "We couldn't save your setup yet. Please try again in a moment.";
+
+function logOnboardingError(message: string, details: Record<string, unknown>) {
+  console.error('[onboarding]', message, details);
+}
+
+type OnboardingInput = ReturnType<typeof onboardingSchema.parse>;
+
+function isMissingRpc(error: { code?: string; message?: string }) {
+  return error.code === 'PGRST202' || /Could not find the function public\.complete_onboarding/i.test(error.message || '');
+}
+
+async function persistStep<T>(name: string, userId: string, action: () => PromiseLike<{ data: T | null; error: unknown }>) {
+  const result = await action();
+  if (result.error) {
+    logOnboardingError(`${name} failed`, { userId, error: result.error });
+    throw result.error;
+  }
+  return result.data;
+}
+
+async function completeOnboardingDirect(supabase: SupabaseClient<Database>, userId: string, input: OnboardingInput) {
+  const location = input.location || null;
+  const currency = input.finances.currency;
+
+  await persistStep('profiles upsert', userId, () => supabase.from('profiles').upsert({
+    user_id: userId,
+    preferred_name: input.preferred_name,
+    location,
+    current_city: location,
+    timezone: input.timezone,
+    one_year_vision: input.one_year_vision,
+    work_style: input.work_style,
+    onboarding_completed: false,
+  } as never, { onConflict: 'user_id' }));
+
+  await persistStep('preferences upsert', userId, () => supabase.from('user_preferences').upsert({
+    user_id: userId,
+    app_name: input.design.app_name || `${input.preferred_name} OS`,
+    theme: input.design.theme,
+    accent_color: input.design.accent_color,
+    font_style: input.design.font_style,
+    density: input.design.density,
+    motion: input.design.motion,
+    chief_of_staff_tone: input.chief_of_staff_tone,
+    design_preferences: input.design as unknown as Json,
+  } as never, { onConflict: 'user_id' }));
+
+  const goalRows = input.goals.map((goal) => ({
+    user_id: userId,
+    title: goal.title,
+    category: goal.category || 'personal',
+    target_date: goal.target_date || null,
+  }));
+  if (goalRows.length) {
+    await persistStep('goals insert', userId, () => supabase.from('goals').insert(goalRows as never));
+    await persistStep('objectives insert', userId, () => supabase.from('objectives').insert(goalRows.map((goal) => ({
+      user_id: userId,
+      title: goal.title,
+      category: goal.category,
+      deadline: goal.target_date,
+    })) as never));
+  }
+
+  if (input.habits.length) {
+    await persistStep('habits insert', userId, () => supabase.from('habits').insert(input.habits.map((habit) => ({
+      user_id: userId,
+      name: habit.name,
+      target_per_week: habit.target_per_week || 7,
+    })) as never));
+  }
+
+  const account = await persistStep<Record<string, unknown>>('finance account insert', userId, () => supabase.from('finance_accounts').insert({
+    user_id: userId,
+    name: 'Primary cash',
+    account_type: 'cash',
+    currency,
+    current_balance: input.finances.current_cash,
+  } as never).select('id').single());
+  const accountId = account?.id as string | undefined;
+
+  if (accountId && input.finances.monthly_income > 0) {
+    await persistStep('income insert', userId, () => supabase.from('income').insert({
+      user_id: userId,
+      account_id: accountId,
+      source: 'Starting monthly income',
+      amount: input.finances.monthly_income,
+      currency,
+      recurring: true,
+      notes: 'Onboarding baseline',
+    } as never));
+    await persistStep('finance account balance reset', userId, () => supabase.from('finance_accounts').update({
+      current_balance: input.finances.current_cash,
+    } as never).eq('id', accountId).eq('user_id', userId));
+  }
+
+  if (input.travel_plans.length) {
+    await persistStep('travel plans insert', userId, () => supabase.from('travel_plans').insert(input.travel_plans.map((plan) => ({
+      user_id: userId,
+      title: plan.title,
+      city: plan.city || null,
+      country: plan.country || null,
+      arrival_at: plan.arrival_at || null,
+      departure_at: plan.departure_at || null,
+      budget: plan.budget || null,
+      currency,
+      status: 'planned',
+    })) as never));
+  }
+
+  const healthRows = [
+    input.health_baseline.weight ? { user_id: userId, metric_type: 'weight', value: input.health_baseline.weight, unit: input.health_baseline.weight_unit, notes: 'Onboarding baseline' } : null,
+    input.health_baseline.average_sleep_hours ? { user_id: userId, metric_type: 'sleep', value: input.health_baseline.average_sleep_hours, unit: 'hours', notes: 'Onboarding baseline' } : null,
+    input.health_baseline.workouts_per_week ? { user_id: userId, metric_type: 'workout', value: input.health_baseline.workouts_per_week, unit: 'per week', notes: 'Onboarding baseline' } : null,
+  ].filter(Boolean);
+  if (healthRows.length) await persistStep('health metrics insert', userId, () => supabase.from('health_metrics').insert(healthRows as never));
+
+  await persistStep('ai context upsert', userId, () => supabase.from('ai_context_profiles').upsert({
+    user_id: userId,
+    life_vision: input.one_year_vision,
+    work_style: input.work_style,
+    health_baseline: input.health_baseline as unknown as Json,
+    finance_baseline: input.finances as unknown as Json,
+    onboarding_snapshot: input as unknown as Json,
+    context_summary: `Preferred name: ${input.preferred_name}. One-year vision: ${input.one_year_vision}. Work style: ${input.work_style}`,
+  } as never, { onConflict: 'user_id' }));
+
+  await persistStep('finance categories insert', userId, () => supabase.from('finance_categories').upsert([
+    ['Housing', 'expense'], ['Food', 'expense'], ['Transport', 'expense'], ['Travel', 'expense'], ['Health', 'expense'],
+    ['Education', 'expense'], ['Content', 'expense'], ['Other', 'expense'], ['Salary', 'income'], ['Freelance', 'income'],
+  ].map(([name, category_type]) => ({ user_id: userId, name, category_type })) as never, { onConflict: 'user_id,name,category_type', ignoreDuplicates: true }));
+
+  await persistStep('profiles completion update', userId, () => supabase.from('profiles').update({ onboarding_completed: true } as never).eq('user_id', userId));
+}
 
 export async function POST(request: Request) {
+  let userId: string | undefined;
+  let input: OnboardingInput | undefined;
+
   try {
-    const { supabase } = await requireUser();
-    const input = onboardingSchema.parse(await request.json());
+    const { user, supabase } = await requireUser();
+    userId = user.id;
+    input = onboardingSchema.parse(await request.json());
+
+    console.info('[onboarding] submit started', {
+      userId,
+      goalCount: input.goals.length,
+      habitCount: input.habits.length,
+      travelPlanCount: input.travel_plans.length,
+      hasHealthBaseline: Boolean(input.health_baseline.weight || input.health_baseline.average_sleep_hours || input.health_baseline.workouts_per_week),
+      hasFinanceBaseline: Boolean(input.finances),
+    });
+
     const { error } = await supabase.rpc('complete_onboarding', { p_payload: input as unknown as Json });
-    if (error) throw error;
+    if (error) {
+      if (isMissingRpc(error)) {
+        console.warn('[onboarding] complete_onboarding rpc missing; using direct persistence fallback', {
+          userId,
+          code: error.code,
+          message: error.message,
+        });
+        await completeOnboardingDirect(supabase, user.id, input);
+      } else {
+        logOnboardingError('complete_onboarding rpc failed', {
+          userId,
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          payloadSummary: {
+            goalCount: input.goals.length,
+            habitCount: input.habits.length,
+            travelPlanCount: input.travel_plans.length,
+            currency: input.finances.currency,
+          },
+        });
+        return NextResponse.json({ error: FRIENDLY_ERROR }, { status: 500 });
+      }
+    }
+
+    const [{ data: profile, error: profileError }, { data: preferences, error: preferencesError }, { count: goalCount, error: goalsError }, { count: habitCount, error: habitsError }] = await Promise.all([
+      supabase.from('profiles').select('user_id,onboarding_completed', { count: 'exact' }).eq('user_id', user.id).maybeSingle(),
+      supabase.from('user_preferences').select('user_id', { count: 'exact' }).eq('user_id', user.id).maybeSingle(),
+      supabase.from('goals').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
+      supabase.from('habits').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
+    ]);
+    const verificationErrors = [profileError, preferencesError, goalsError, habitsError].filter(Boolean);
+    const verificationFailed = verificationErrors.length > 0 || !profile?.onboarding_completed || !preferences || (goalCount ?? 0) < input.goals.length || (habitCount ?? 0) < input.habits.length;
+
+    if (verificationFailed) {
+      logOnboardingError('post-submit verification failed', {
+        userId,
+        profile,
+        hasPreferences: Boolean(preferences),
+        goalCount,
+        expectedGoalCount: input.goals.length,
+        habitCount,
+        expectedHabitCount: input.habits.length,
+        verificationErrors,
+      });
+      return NextResponse.json({ error: FRIENDLY_ERROR }, { status: 500 });
+    }
+
+    console.info('[onboarding] submit completed', { userId, goalCount, habitCount });
     return NextResponse.json({ completed: true });
-  } catch (error) { return apiError(error); }
+  } catch (error) {
+    if (error instanceof UnauthorizedError) return NextResponse.json({ error: error.message }, { status: 401 });
+    if (error instanceof ZodError) {
+      logOnboardingError('payload validation failed', { userId, issues: error.flatten() });
+      return NextResponse.json({ error: 'Some setup details need to be corrected.', issues: error.flatten() }, { status: 400 });
+    }
+    logOnboardingError('unexpected route failure', {
+      userId,
+      error,
+      payloadSummary: input ? {
+        goalCount: input.goals.length,
+        habitCount: input.habits.length,
+        travelPlanCount: input.travel_plans.length,
+        currency: input.finances.currency,
+      } : null,
+    });
+    return NextResponse.json({ error: FRIENDLY_ERROR }, { status: 500 });
+  }
 }
