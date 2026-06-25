@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireUser } from '@/lib/auth';
+import { ensureProfile, requireUser } from '@/lib/auth';
 import { apiError } from '@/lib/api';
 import { z } from 'zod';
 
@@ -8,8 +8,9 @@ const schema = z.object({ display_name: z.string().trim().min(1).max(100).option
 export async function GET() {
   try {
     const { user, supabase } = await requireUser();
+    await ensureProfile(supabase, user);
     const [{ data, error }, { data: preferences, error: preferenceError }] = await Promise.all([
-      supabase.from('profiles').select('*').eq('user_id', user.id).single(),
+      supabase.from('profiles').select('*').eq('user_id', user.id).maybeSingle(),
       supabase.from('user_preferences').select('*').eq('user_id', user.id).maybeSingle(),
     ]);
     if (error || preferenceError) throw error || preferenceError;
@@ -20,6 +21,7 @@ export async function GET() {
 export async function PATCH(request: Request) {
   try {
     const { user, supabase } = await requireUser();
+    await ensureProfile(supabase, user);
     const input = schema.parse(await request.json());
     const { display_name, ...rest } = input;
     const { data, error } = await supabase.from('profiles').update({ ...rest, preferred_name: display_name } as never).eq('user_id', user.id).select().single();

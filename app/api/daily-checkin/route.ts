@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     const from = url.searchParams.get('from');
     const to = url.searchParams.get('to');
     const q = url.searchParams.get('q')?.trim().toLowerCase() || '';
-    let query = supabase.from('daily_checkins').select('*').eq('user_id', user.id).order('checkin_date', { ascending: false }).limit(366);
+    let query = supabase.from('daily_checkins').select('*').eq('user_id', user.id).order('checked_in_at', { ascending: false }).limit(366);
     if (from) query = query.gte('checkin_date', from);
     if (to) query = query.lte('checkin_date', to);
     const { data, error } = await query;
@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     const weekly = filtered.filter((item) => new Date(`${item.checkin_date}T12:00:00`).getTime() >= now - 7 * 86400000);
     const monthly = filtered.filter((item) => new Date(`${item.checkin_date}T12:00:00`).getTime() >= now - 30 * 86400000);
     const metrics = (items: Array<Record<string, unknown>>) => ({ mood: average(items, 'mood'), energy: average(items, 'energy'), stress: average(items, 'stress'), productivity: average(items, 'productivity') });
-    return NextResponse.json({ data: filtered, stats: { weekly: metrics(weekly as Array<Record<string, unknown>>), monthly: metrics(monthly as Array<Record<string, unknown>>) }, trends: filtered.slice().reverse().slice(-30).map((item) => ({ date: item.checkin_date, mood: item.mood, energy: item.energy, stress: item.stress, productivity: item.productivity })) });
+    return NextResponse.json({ data: filtered, stats: { weekly: metrics(weekly as Array<Record<string, unknown>>), monthly: metrics(monthly as Array<Record<string, unknown>>) }, trends: filtered.slice().reverse().slice(-30).map((item) => ({ date: item.local_date || item.checkin_date, checked_in_at: item.checked_in_at, time_of_day: item.time_of_day, mood: item.mood, energy: item.energy, stress: item.stress, productivity: item.productivity })) });
   } catch (error) { return apiError(error); }
 }
 
@@ -31,8 +31,13 @@ export async function POST(request: Request) {
   try {
     const { user, supabase } = await requireUser();
     const input = entitySchemas.daily_checkins.parse(await request.json());
+    const checkedInAt = input.checked_in_at ? new Date(input.checked_in_at) : new Date();
+    const timezone = input.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York';
+    const localDate = input.local_date || input.checkin_date || checkedInAt.toISOString().slice(0, 10);
+    const hour = checkedInAt.getHours();
+    const timeOfDay = input.time_of_day || (hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : hour < 21 ? 'evening' : 'night');
     const aiSummary = input.ai_summary || `Mood ${input.mood}/10, energy ${input.energy}/10, stress ${input.stress}/10, productivity ${input.productivity}/10. ${input.biggest_win ? `Win: ${input.biggest_win}` : 'No win recorded.'} ${input.tomorrow_priority ? `Tomorrow: ${input.tomorrow_priority}` : 'No tomorrow priority recorded.'}`;
-    const { data, error } = await supabase.from('daily_checkins').upsert({ ...input, ai_summary: aiSummary, user_id: user.id } as never, { onConflict: 'user_id,checkin_date' }).select().single();
+    const { data, error } = await supabase.from('daily_checkins').upsert({ ...input, checkin_date: localDate, local_date: localDate, checked_in_at: checkedInAt.toISOString(), timezone, time_of_day: timeOfDay, ai_summary: aiSummary, user_id: user.id } as never, { onConflict: 'user_id,checkin_date' }).select().single();
     if (error) throw error;
     await createCheckinMemories(supabase, user.id, data as Record<string, unknown>).catch((memoryError) => console.error('Could not create check-in memories:', memoryError));
     return NextResponse.json({ data }, { status: 201 });

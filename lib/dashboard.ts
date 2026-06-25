@@ -34,7 +34,7 @@ export async function getDashboardSnapshot(supabase: SupabaseClient<Database>, u
   const since7 = new Date(Date.now() - 7 * 86400000).toISOString();
   const monthStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString().slice(0, 10);
   const [profileResult, preferencesResult, goalsResult, objectivesResult, benchmarksResult, tasksResult, habitsResult, logsResult, accountsResult, transactionsResult, incomeResult, travelResult, contentResult, healthResult, healthProfileResult, checkinResult, journalResult, insightResult, briefingResult, decisionResult, contextResult, memoriesResult, reviewResult] = await Promise.all([
-    supabase.from('profiles').select('*').eq('user_id', userId).single(),
+    supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle(),
     supabase.from('user_preferences').select('*').eq('user_id', userId).maybeSingle(),
     supabase.from('goals').select('*').eq('user_id', userId).order('created_at'),
     supabase.from('objectives').select('*').eq('user_id', userId).order('created_at'),

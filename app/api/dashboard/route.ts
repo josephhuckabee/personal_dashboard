@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireUser } from '@/lib/auth';
+import { ensureProfile, requireUser } from '@/lib/auth';
 import { apiError } from '@/lib/api';
 import { getDashboardSnapshot } from '@/lib/dashboard';
 import { buildLocalChiefOfStaffSummary } from '@/lib/local-chief-of-staff';
@@ -10,6 +10,7 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
     const { user, supabase } = await requireUser();
+    await ensureProfile(supabase, user);
     const snapshot = await getDashboardSnapshot(supabase, user.id);
     const executive = await persistDailyExecutiveIntelligence(supabase, user.id, snapshot);
     const weeklyTrend = await getWeeklyTrend(supabase, user.id);

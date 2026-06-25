@@ -4,12 +4,47 @@ type Row = Record<string, unknown> & { id: string; user_id: string; created_at: 
 type Insert = Record<string, unknown> & { user_id: string };
 type Update = Record<string, unknown>;
 
+type ProfileRow = Omit<Row, 'id'> & {
+  user_id: string;
+  preferred_name: string | null;
+  location: string | null;
+  current_city: string | null;
+  current_country: string | null;
+  chapter_started_at: string | null;
+  timezone: string;
+  onboarding_completed: boolean;
+  one_year_vision: string | null;
+  work_style: string | null;
+  age: number | null;
+  gender: string | null;
+  passport_country: string | null;
+  adaptive_profile: Json;
+};
+
+type UserPreferencesRow = Row & {
+  app_name: string | null;
+  theme: 'default' | 'midnight' | 'soft';
+  accent_color: string;
+  font_style: 'default' | 'editorial' | 'system';
+  density: 'comfortable' | 'compact';
+  chief_of_staff_tone: 'gentle' | 'executive' | 'direct';
+  design_preferences: Json;
+};
+
+type DailyCheckinRow = Row & {
+  checkin_date: string;
+  checked_in_at: string;
+  local_date: string;
+  timezone: string;
+  time_of_day: 'morning' | 'afternoon' | 'evening' | 'night' | null;
+};
+
 export type Database = {
   public: {
     Tables: {
       users: { Row: Omit<Row, 'user_id'> & { display_name: string | null }; Insert: Record<string, unknown> & { id: string }; Update: Update; Relationships: [] };
-      profiles: { Row: Omit<Row, 'id'>; Insert: Insert; Update: Update; Relationships: [] };
-      user_preferences: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
+      profiles: { Row: ProfileRow; Insert: Insert; Update: Update; Relationships: [] };
+      user_preferences: { Row: UserPreferencesRow; Insert: Insert; Update: Update; Relationships: [] };
       goals: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
       objectives: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
       tasks: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
@@ -24,6 +59,8 @@ export type Database = {
       content_projects: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
       relationships: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
       health_metrics: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
+      health_samples: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
+      workout_sessions: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
       health_profiles: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
       medications: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
       supplements: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
@@ -31,12 +68,14 @@ export type Database = {
       timeline_events: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
       finance_integrations: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
       calendar_events: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
+      context_events: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
+      weather_cache: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
       ai_briefings: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
       ai_decisions: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
       ai_usage_logs: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
       ai_context_profiles: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
       ai_recommendations: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
-      daily_checkins: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
+      daily_checkins: { Row: DailyCheckinRow; Insert: Insert; Update: Update; Relationships: [] };
       finance_categories: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
       memories: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
       memory_relationships: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };

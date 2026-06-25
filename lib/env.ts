@@ -12,6 +12,7 @@ const serverSchema = publicSchema.extend({
   SUPABASE_SERVICE_ROLE_KEY: optionalSecret,
   OPENAI_API_KEY: optionalSecret,
   ANTHROPIC_API_KEY: optionalSecret,
+  WEATHER_API_KEY: optionalSecret,
   AI_PROVIDER: z.enum(['openai', 'anthropic']).default('openai'),
   AI_MODEL: z.string().default('gpt-4.1'),
 });
@@ -37,6 +38,7 @@ export function serverEnv() {
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+    WEATHER_API_KEY: process.env.WEATHER_API_KEY,
     AI_PROVIDER: process.env.AI_PROVIDER,
     AI_MODEL: process.env.AI_MODEL,
   });
