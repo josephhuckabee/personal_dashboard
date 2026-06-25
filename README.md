@@ -21,7 +21,7 @@ Open [http://localhost:3000](http://localhost:3000). Email/password authenticati
 
 ```text
 NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 OPENAI_API_KEY=
 ANTHROPIC_API_KEY=
@@ -29,7 +29,7 @@ AI_PROVIDER=openai
 AI_MODEL=gpt-4.1
 ```
 
-`SUPABASE_SERVICE_ROLE_KEY` is server-only and is used by the Chief of Staff aggregation function after the API route verifies the signed-in user. Never expose it to the browser.
+`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` is the browser-safe Supabase key. The older `NEXT_PUBLIC_SUPABASE_ANON_KEY` name is still accepted as a fallback. `SUPABASE_SERVICE_ROLE_KEY` is server-only and is used by server APIs after they verify the signed-in user. Never expose it to the browser or any `NEXT_PUBLIC_` variable.
 
 ## Database and privacy
 
