@@ -6,3 +6,5 @@ data/receipts/*
 data/travel/*
 !data/travel/.gitkeep
 .next/
+.next/
+.env.local
