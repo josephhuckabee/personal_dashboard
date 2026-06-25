@@ -5,6 +5,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/lib/supabase/database.types';
 import type { Json } from '@/lib/supabase/database.types';
 import { ZodError } from 'zod';
+import { createOnboardingMemories } from '@/lib/ai/memory';
 
 const FRIENDLY_ERROR = "We couldn't save your setup yet. Please try again in a moment.";
 
@@ -229,6 +230,10 @@ export async function POST(request: Request) {
       });
       return NextResponse.json({ error: FRIENDLY_ERROR }, { status: 500 });
     }
+
+    await createOnboardingMemories(supabase, user.id, input).catch((memoryError) => {
+      logOnboardingError('onboarding memory creation failed', { userId, error: memoryError });
+    });
 
     console.info('[onboarding] submit completed', { userId, goalCount, habitCount });
     return NextResponse.json({ completed: true });

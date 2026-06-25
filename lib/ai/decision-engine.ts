@@ -5,6 +5,7 @@ import { getDashboardSnapshot } from '@/lib/dashboard';
 import { chiefOfStaffDecisionSchema, type ChiefOfStaffDecision } from '@/lib/schemas';
 import { serverEnv } from '@/lib/env';
 import { buildLocalChiefOfStaffSummary } from '@/lib/local-chief-of-staff';
+import { getMemoryContext } from '@/lib/ai/memory';
 
 const safety = `You are the user's private AI Chief of Staff inside You OS.
 Analyze only the supplied user-scoped Supabase snapshot. Never invent missing facts.
@@ -35,6 +36,7 @@ export async function generateChiefOfStaffDecisionEngine(userId: string) {
   const snapshot = await getDashboardSnapshot(supabase, userId);
   const env = serverEnv();
   const localSummary = buildLocalChiefOfStaffSummary(snapshot);
+  const memoryContext = await getMemoryContext(supabase, userId);
   const profile = snapshot.profile as Record<string, unknown> | null;
   const objectives = snapshot.objectives as Array<Record<string, unknown> & { calculated_status: string }>;
   const compactSnapshot = {
@@ -45,7 +47,7 @@ export async function generateChiefOfStaffDecisionEngine(userId: string) {
     open_tasks: (snapshot.tasks as Array<Record<string, unknown>>).filter((item) => !['completed','cancelled'].includes(String(item.status))).slice(0, 20).map((item) => ({ title: item.title, priority: item.priority, due_at: item.due_at })),
     habits: snapshot.habits.map((item) => ({ name: (item as Record<string, unknown>).name, streak: item.streak, weekly_consistency: item.weeklyConsistency })),
     finance: { current_cash: snapshot.finance.currentCash, monthly_burn: snapshot.finance.monthlyBurn, monthly_income: snapshot.finance.monthlyIncome, runway_months: snapshot.finance.runwayMonths, risk_score: snapshot.finance.financialRiskScore },
-    travel: snapshot.travel.slice(0, 8), health: snapshot.health.slice(0, 12), latest_checkin: snapshot.checkins[0] || null, content: snapshot.content.slice(0, 8), deterministic_summary: localSummary,
+    travel: snapshot.travel.slice(0, 8), health: snapshot.health.slice(0, 12), latest_checkin: snapshot.checkins[0] || null, content: snapshot.content.slice(0, 8), memories: memoryContext.compact, deterministic_summary: localSummary,
   };
   const schemaExample = { top_priorities: [{ title: 'string', reason: 'string', priority: 'low|medium|high', estimated_minutes: 30 }], risks: [{ title: 'string', reason: 'string', severity: 'low|medium|high', recommended_action: 'string' }], opportunities: [{ title: 'string', reason: 'string', recommended_action: 'string' }], recommended_focus: 'string', recommended_avoidance: 'string', execution_readiness_score: 0, chief_of_staff_note: 'string' };
   const prompt = `${safety}\nSaved tone: ${String(snapshot.preferences?.chief_of_staff_tone || 'executive')}\nRequired schema: ${JSON.stringify(schemaExample)}\nCompact user-scoped summary: ${JSON.stringify(compactSnapshot)}`;

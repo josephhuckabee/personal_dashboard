@@ -271,16 +271,29 @@ function CalendarPreview() {
 function Dashboard({ habits, toggleHabit }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
-  useEffect(() => { fetch('/api/dashboard').then(async (response) => { const result = await response.json(); if (!response.ok) throw new Error(result.error); return result; }).then(setData).catch((reason) => setError(reason.message)); }, []);
+  const [thinking, setThinking] = useState('');
+  const load = () => fetch('/api/dashboard').then(async (response) => { const result = await response.json(); if (!response.ok) throw new Error(result.error); return result; }).then(setData).catch((reason) => setError(reason.message));
+  useEffect(() => { load(); }, []);
+  const runAi = async (feature, url) => {
+    setThinking(feature);
+    try {
+      const response = await fetch(url, { method: 'POST' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error);
+      await load();
+      toast(`${feature} saved`);
+    } catch (reason) { setError(reason.message); toast(reason.message, 'error'); }
+    finally { setThinking(''); }
+  };
   const finance = data?.finance;
   const objectives = data?.objectives || [];
   const briefing = data?.briefing;
   const decision = data?.decision;
   const localSummary = data?.localSummary;
   const profile = data?.profile;
-  const risks = decision?.risks || briefing?.current_risks || [...(localSummary?.overdue_tasks || []).map((item) => ({ title: item.title, reason: `Task was due ${new Date(item.due_at).toLocaleDateString()}.`, severity: 'high' })), ...objectives.filter((item) => item.calculated_status !== 'healthy' && item.calculated_status !== 'completed').map((item) => ({ title: item.title, reason: item.calculated_status === 'at_risk' ? 'Progress or recent activity is behind the required pace.' : 'This objective needs recent execution evidence.', severity: item.calculated_status === 'at_risk' ? 'high' : 'medium' }))];
+  const risks = decision?.risks || briefing?.risks || briefing?.current_risks || [...(localSummary?.overdue_tasks || []).map((item) => ({ title: item.title, reason: `Task was due ${new Date(item.due_at).toLocaleDateString()}.`, severity: 'high' })), ...objectives.filter((item) => item.calculated_status !== 'healthy' && item.calculated_status !== 'completed').map((item) => ({ title: item.title, reason: item.calculated_status === 'at_risk' ? 'Progress or recent activity is behind the required pace.' : 'This objective needs recent execution evidence.', severity: item.calculated_status === 'at_risk' ? 'high' : 'medium' }))];
   const opportunities = decision?.opportunities || briefing?.opportunities || [];
-  const todayPlan = decision?.top_priorities?.map((item) => ({ task: item.title, ...item })) || briefing?.today_plan || (data?.tasks || []).filter((item) => item.status !== 'completed').slice(0, 3).map((item) => ({ task: item.title, priority: item.priority }));
+  const todayPlan = decision?.top_priorities?.map((item) => ({ task: item.title, ...item })) || briefing?.top_priorities?.map((item) => ({ task: item.title, priority: item.category, ...item })) || briefing?.today_plan || (data?.tasks || []).filter((item) => item.status !== 'completed').slice(0, 3).map((item) => ({ task: item.title, priority: item.priority }));
   const dashboardMoney = (value = 0) => `$${Number(value).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
   const currentTravel = (data?.travel || []).find((item) => item.status === 'active') || data?.travel?.[0];
   const currentCity = profile?.current_city || currentTravel?.city || 'Not set';
@@ -290,6 +303,7 @@ function Dashboard({ habits, toggleHabit }) {
     <>
       <PageHeader eyebrow={`${new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })} · ${currentCity}`} title={<>Command Center<span className="title-dot">.</span></>} copy={`Year of Reinvention${dayAbroad ? ` · Day ${dayAbroad}` : ''}. Are you becoming the person you said you wanted to become?`} action={<Pill tone={error ? 'amber' : 'green'}><Activity size={12} /> {error ? 'Data unavailable' : 'Systems online'}</Pill>} />
       {error && <div className="system-notice"><ShieldAlert size={15} /> {error}</div>}
+      <div className="assistant-actions"><button className="primary-button" onClick={() => runAi('Briefing', '/api/ai/briefing')} disabled={Boolean(thinking)}><Sparkles size={15} /> Generate Briefing</button><button className="subtle-button" onClick={() => runAi('Priorities', '/api/ai/prioritize')} disabled={Boolean(thinking)}><Zap size={15} /> Prioritize My Day</button><button className="text-button" onClick={() => runAi('Weekly review', '/api/ai/weekly-review')} disabled={Boolean(thinking)}><NotebookPen size={15} /> Generate Weekly Review</button>{thinking && <Pill tone="blue"><RefreshCw className="spin" size={12} /> {thinking}</Pill>}</div>
       <Card className="morning-brief-card">
         <div className="brief-intro"><Pill tone="blue">Morning brief · {currentCity}</Pill><h2>Good morning, {profile?.display_name || 'there'}.</h2><p>{briefing?.summary || (data ? 'Generate a Chief of Staff briefing to identify current risks, opportunities, and today’s highest-return plan.' : 'Loading your current operating picture…')}</p><div className="brief-status"><span><small>Overall status</small><strong>{risks.some((item) => item.severity === 'high') ? 'ATTENTION' : 'ON TRACK'}</strong></span><span><small>Day abroad</small><strong>{dayAbroad || '—'}</strong></span><span><small>Open tasks</small><strong>{(data?.tasks || []).filter((item) => item.status !== 'completed').length}</strong></span></div></div>
         <div className="life-score-ring"><Donut value={data?.executionReadiness || 0} label={data?.executionReadiness ?? '—'} sublabel="readiness" /><span><TrendingUp size={13} /> Live score</span></div>
@@ -318,7 +332,7 @@ function Dashboard({ habits, toggleHabit }) {
 
         <Card className="assistant-card span-12" tone="assistant">
           <div className="assistant-icon"><WandSparkles size={24} /></div>
-          <div className="assistant-copy"><Pill tone="violet">Chief of Staff note</Pill><h2>{decision?.chief_of_staff_note || briefing?.chief_of_staff_note || localSummary?.today_best_focus || 'Add a task or habit to establish today’s focus.'}</h2><p>{decision ? `Focus: ${decision.recommended_focus} Avoid: ${decision.recommended_avoidance}` : `Focus: ${localSummary?.today_best_focus || 'Not enough data.'} Avoid: ${localSummary?.recommended_avoidance || 'Not enough data.'}`}</p><div className="assistant-actions"><button className="primary-button" onClick={() => fetch('/api/ai/prioritize', { method: 'POST' }).then(async (response) => { if (!response.ok) throw new Error((await response.json()).error); window.location.reload(); }).catch((error) => setError(error.message))}>Prioritize My Day</button></div></div>
+          <div className="assistant-copy"><Pill tone="violet">Chief of Staff note</Pill><h2>{decision?.chief_of_staff_note || briefing?.chief_of_staff_note || localSummary?.today_best_focus || 'Add a task or habit to establish today’s focus.'}</h2><p>{decision ? `Focus: ${decision.recommended_focus} Avoid: ${decision.recommended_avoidance}` : `Focus: ${briefing?.recommended_focus || localSummary?.today_best_focus || 'Not enough data.'} Avoid: ${briefing?.recommended_avoidance || localSummary?.recommended_avoidance || 'Not enough data.'}`}</p><div className="assistant-actions"><button className="primary-button" onClick={() => runAi('Priorities', '/api/ai/prioritize')} disabled={Boolean(thinking)}>Prioritize My Day</button><button className="subtle-button" onClick={() => runAi('Briefing', '/api/ai/briefing')} disabled={Boolean(thinking)}>Generate Briefing</button></div></div>
           <div className="focus-score"><span>Execution readiness</span><strong>{decision?.execution_readiness_score ?? data?.executionReadiness ?? '—'}</strong><small>{(decision?.execution_readiness_score ?? data?.executionReadiness) >= 75 ? 'High-leverage day' : data ? 'Protect the basics' : 'Loading'}</small></div>
         </Card>
       </div>
@@ -524,13 +538,46 @@ function RelationshipsPage() {
 
 function InsightsPage() {
   const [data, setData] = useState(null);
-  useEffect(() => { fetch('/api/dashboard').then((response) => response.json()).then(setData).catch(() => {}); }, []);
+  const [memories, setMemories] = useState([]);
+  const [query, setQuery] = useState('');
+  const [notice, setNotice] = useState('');
+  const load = (q = query) => Promise.all([
+    fetch('/api/dashboard').then((response) => response.json()),
+    fetch(`/api/memories${q ? `?q=${encodeURIComponent(q)}` : ''}`).then((response) => response.json()),
+  ]).then(([nextData, memoryResult]) => { setData(nextData); setMemories(memoryResult.data || []); });
+  useEffect(() => { load('').catch(() => {}); }, []);
+  const updateMemory = async (memory, action) => {
+    let body = action === 'delete' ? undefined : { action };
+    if (action === 'edit') {
+      const title = window.prompt('Memory title', memory.title);
+      if (!title) return;
+      const content = window.prompt('Memory content', memory.content);
+      if (!content) return;
+      body = { title, content };
+    }
+    const response = await fetch(`/api/memories/${memory.id}`, { method: action === 'delete' ? 'DELETE' : 'PATCH', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}));
+      setNotice(result.error || 'Could not update memory.');
+      toast('Something went wrong', 'error');
+      return;
+    }
+    setNotice(action === 'delete' ? 'Memory deleted.' : action === 'important' ? 'Memory marked important.' : action === 'inaccurate' ? 'Memory marked inaccurate.' : 'Memory edited.');
+    toast(action === 'delete' ? 'Memory deleted' : 'Memory updated');
+    load();
+  };
   const briefing = data?.briefing;
-  const insights = [...(briefing?.current_risks || []).map((item) => ({ title: item.title, finding: item.reason, action: item.recommended_action, tone: item.severity === 'high' ? 'amber' : 'violet', kind: 'Risk' })), ...(briefing?.opportunities || []).map((item) => ({ title: item.title, finding: item.reason, action: item.recommended_action, tone: 'green', kind: item.category }))];
-  return <><PageHeader eyebrow="Behavioral intelligence" title={<>Insights engine<span className="title-dot">.</span></>} copy="Your OS converts repeated behavior into evidence, forecasts, and recommendations you can act on." />
+  const review = data?.weeklyReview;
+  const insights = [...(briefing?.risks || briefing?.current_risks || []).map((item) => ({ title: item.title, finding: item.reason, action: item.recommended_action, tone: item.severity === 'high' ? 'amber' : 'violet', kind: 'Risk' })), ...(briefing?.opportunities || []).map((item) => ({ title: item.title, finding: item.reason, action: item.recommended_action, tone: item.impact === 'high' ? 'green' : 'blue', kind: item.impact || item.category || 'Opportunity' }))];
+  const featuredMemories = memories.filter((memory) => memory.is_important || Number(memory.importance_score || 0) >= 75);
+  return <><PageHeader eyebrow="Behavioral intelligence" title={<>Memory & insights<span className="title-dot">.</span></>} copy="Important facts, patterns, risks, lessons, decisions, and milestones your OS can reuse." />
+    {notice && <div className="system-notice">{notice}</div>}
     <div className="insight-hero"><Card><div><Pill tone="green"><Radar size={12} /> Current briefing</Pill><h2>{briefing?.summary || 'No briefing has been generated.'}</h2><p>{briefing?.chief_of_staff_note || 'Generate a Chief of Staff briefing after recording objectives, tasks, habits, finance, health, travel, and today’s check-in.'}</p></div><Donut value={data?.executionReadiness || 0} label={data?.executionReadiness ?? '—'} sublabel="readiness" /></Card></div>
+    <Card><SectionTitle title="Memory search" meta={`${memories.length} memories`} /><form className="studio-add-form compact-form" onSubmit={(event) => { event.preventDefault(); load(query); }}><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search memories, risks, patterns, lessons, decisions..." /><button className="primary-button"><Search size={15} /> Search</button></form></Card>
+    <div className="insight-grid">{featuredMemories.length ? featuredMemories.slice(0, 8).map((memory) => <Card className="behavior-insight" key={memory.id}><Pill tone={memory.type === 'risk' || memory.type === 'warning' ? 'amber' : memory.type === 'opportunity' ? 'green' : 'blue'}>{memory.type}</Pill><h2>{memory.title}</h2><p>{memory.content}</p><div className="assistant-actions"><button className="subtle-button" onClick={() => updateMemory(memory, 'important')}>Important</button><button className="subtle-button" onClick={() => updateMemory(memory, 'edit')}>Edit</button><button className="text-button" onClick={() => updateMemory(memory, 'inaccurate')}>Inaccurate</button><button className="text-button" onClick={() => updateMemory(memory, 'delete')}>Delete</button></div></Card>) : <Card><p className="plan-empty">No important memories yet. Complete onboarding, check in, finish tasks, or generate a weekly review.</p></Card>}</div>
+    {review && <Card className="learning-timeline-card"><SectionTitle title="Latest weekly review" meta={`${new Date(`${review.week_start}T12:00:00`).toLocaleDateString()} - ${new Date(`${review.week_end}T12:00:00`).toLocaleDateString()}`} /><div className="signal-list"><div><b>Next-week focus</b><span>{review.recommended_next_week_focus}</span></div><div><b>Habit analysis</b><span>{review.habit_analysis}</span></div><div><b>Finance analysis</b><span>{review.finance_analysis}</span></div><div><b>Goal progress</b><span>{review.goal_progress}</span></div></div></Card>}
     <div className="insight-grid">{insights.length ? insights.map((insight) => <Card className="behavior-insight" key={`${insight.kind}-${insight.title}`}><Pill tone={insight.tone}>{insight.kind}</Pill><h2>{insight.title}</h2><p>{insight.finding}</p><div className="insight-action"><Lightbulb size={15} /><span><small>Recommended action</small><b>{insight.action}</b></span></div></Card>) : <Card><p className="plan-empty">No evidence-backed insights yet. Generate a briefing from the Chief of Staff screen.</p></Card>}</div>
-    <Card className="learning-timeline-card"><SectionTitle title="Data coverage" meta="What the briefing can currently analyze" /><div className="learning-timeline">{[['Objectives', data?.objectives?.length || 0], ['Habits', data?.habits?.length || 0], ['Tasks', data?.tasks?.length || 0], ['Check-ins', data?.checkins?.length || 0], ['Health metrics', data?.health?.length || 0], ['Travel plans', data?.travel?.length || 0]].map(([title, count]) => <div key={title}><span>{count}</span><i /><strong>{title}</strong><Pill tone={count ? 'green' : 'neutral'}>{count ? 'Available' : 'Missing'}</Pill></div>)}</div></Card></>;
+    <Card className="learning-timeline-card"><SectionTitle title="Data coverage" meta="What the briefing can currently analyze" /><div className="learning-timeline">{[['Memories', memories.length], ['Objectives', data?.objectives?.length || 0], ['Habits', data?.habits?.length || 0], ['Tasks', data?.tasks?.length || 0], ['Check-ins', data?.checkins?.length || 0], ['Travel plans', data?.travel?.length || 0]].map(([title, count]) => <div key={title}><span>{count}</span><i /><strong>{title}</strong><Pill tone={count ? 'green' : 'neutral'}>{count ? 'Available' : 'Missing'}</Pill></div>)}</div></Card></>;
 }
 
 function TimelinePage() {
@@ -618,14 +665,26 @@ function AssistantPage() {
       setMessages((current) => [...current, { from: 'ai', text: `Briefing failed: ${error.message}` }]);
     } finally { setThinking(false); }
   };
+  const generateWeeklyReview = async () => {
+    setThinking(true);
+    try {
+      const response = await fetch('/api/ai/weekly-review', { method: 'POST' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error);
+      setMessages((current) => [...current, { from: 'ai', text: `Weekly focus: ${result.data.recommended_next_week_focus}` }]);
+      await load();
+    } catch (error) {
+      setMessages((current) => [...current, { from: 'ai', text: `Weekly review failed: ${error.message}` }]);
+    } finally { setThinking(false); }
+  };
   const briefing = dashboard?.briefing;
-  const plan = briefing?.today_plan || [];
+  const plan = briefing?.top_priorities?.map((item) => ({ task: item.title, priority: item.category, ...item })) || briefing?.today_plan || [];
   const finance = briefing?.finance_analysis || dashboard?.finance;
   return (
     <><PageHeader eyebrow="AI executive office" title={<>Chief of Staff<span className="title-dot">.</span></>} copy="Planning, accountability, risk detection, and operational guidance based only on your recorded data." action={<Pill tone={status?.ready ? 'green' : 'amber'}><Activity size={12} /> {status?.ready ? 'User data connected' : 'Data unavailable'}</Pill>} />
     <div className="chief-report-grid"><Card><Pill tone="blue">Current state</Pill><h3>{briefing?.summary || 'No briefing generated.'}</h3><p>{briefing ? `Generated ${new Date(briefing.created_at).toLocaleString()}` : 'Record data, then generate the current briefing.'}</p></Card><Card><Pill tone="amber">Primary risk</Pill><h3>{briefing?.current_risks?.[0]?.title || 'No risk identified.'}</h3><p>{briefing?.current_risks?.[0]?.reason || 'The system will not invent a risk without supporting data.'}</p></Card><Card><Pill tone="violet">Finance posture</Pill><h3>{finance?.runway_months != null || finance?.runwayMonths != null ? `${Number(finance.runway_months ?? finance.runwayMonths).toFixed(1)} months runway` : 'Runway unavailable'}</h3><p>{finance?.warning || 'Runway requires current cash and recorded spending.'}</p></Card></div>
     <div className="assistant-layout"><Card className="chat-card executive-console"><div className="chat-header"><span className="assistant-icon"><Sparkles size={20} /></span><span><strong>Executive command line</strong><small><i /> {status?.openai ? 'Chief of Staff online' : 'Local mode · add OpenAI key for full intelligence'}</small></span><Pill tone={status?.ready ? 'green' : 'amber'}>{status?.ready ? 'Learning' : 'Offline'}</Pill></div><div className="messages">{messages.map((message, index) => <div className={`message ${message.from}`} key={index}>{message.from === 'ai' && <span className="mini-ai"><Sparkles size={14} /></span>}<p>{message.text}</p></div>)}{thinking && <div className="message ai"><span className="mini-ai"><RefreshCw className="spin" size={14} /></span><p>Reviewing objectives, behavior, calendar, and risk…</p></div>}</div><div className="prompt-chips">{['Build my CEO plan', 'Where am I avoiding reality?', 'Forecast December', 'Run weekly review'].map((prompt) => <button key={prompt} onClick={() => setInput(prompt)}>{prompt}</button>)}</div><form className="chat-input" onSubmit={submit}><input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Issue a command, request a decision, or run a review…" /><button aria-label="Send" disabled={thinking}><Send size={17} /></button></form></Card>
-    <div className="assistant-side"><Card><SectionTitle title="Today’s plan" meta={plan.length ? `${plan.length} priority actions` : 'No generated plan'} /><div className="plan-list">{plan.slice(0, 5).map((item, index) => <div key={`${item.task}-${index}`}><span>{String(index + 1).padStart(2, '0')}</span><i /><span><strong>{item.task}</strong><small>{item.priority} · {item.estimated_minutes} minutes</small></span></div>)}{!plan.length && <p className="plan-empty">Generate a briefing to build today’s evidence-based plan.</p>}</div><button className="primary-button full" onClick={generateBriefing} disabled={thinking}><Sparkles size={15} /> Generate current briefing</button></Card>
+    <div className="assistant-side"><Card><SectionTitle title="Today’s plan" meta={plan.length ? `${plan.length} priority actions` : 'No generated plan'} /><div className="plan-list">{plan.slice(0, 5).map((item, index) => <div key={`${item.task}-${index}`}><span>{String(index + 1).padStart(2, '0')}</span><i /><span><strong>{item.task}</strong><small>{item.priority || item.category || 'medium'} · {item.estimated_minutes || 45} minutes</small></span></div>)}{!plan.length && <p className="plan-empty">Generate a briefing to build today’s evidence-based plan.</p>}</div><button className="primary-button full" onClick={generateBriefing} disabled={thinking}><Sparkles size={15} /> Generate current briefing</button><button className="subtle-button full" onClick={generateWeeklyReview} disabled={thinking}><NotebookPen size={15} /> Generate weekly review</button></Card>
     <Card className="apple-sync-card"><span className="sms-icon"><ShieldAlert size={20} /></span><div><Pill tone="blue">Safety boundary</Pill><h3>Only recorded data.</h3><p>Missing evidence stays missing. Recommendations are operational guidance and never medical, legal, or financial certainty.</p></div></Card>
     <Card className="sms-card"><span className="sms-icon"><Activity size={20} /></span><div><h3>Execution readiness</h3><p>Calculated from current habits, objectives, task completion, and the latest daily check-in.</p></div><Pill tone={(dashboard?.executionReadiness || 0) >= 75 ? 'green' : 'amber'}>{dashboard?.executionReadiness ?? '—'} / 100</Pill></Card></div></div></>
   );

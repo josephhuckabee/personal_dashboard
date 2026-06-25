@@ -3,6 +3,7 @@ import { requireUser } from '@/lib/auth';
 import { apiError } from '@/lib/api';
 import { entityNames, entitySchemas, type EntityName } from '@/lib/schemas';
 import { syncParentProgress } from '@/lib/progress';
+import { createTaskMemory } from '@/lib/ai/memory';
 
 function entity(value: string): EntityName {
   if (!entityNames.includes(value as EntityName)) throw new Error('Unknown entity.');
@@ -21,7 +22,11 @@ export async function PATCH(request: Request, context: { params: Promise<{ entit
     if ((name === 'goals' || name === 'objectives') && Number((input as Record<string, unknown>).progress) >= 100) updates.status = 'completed';
     const { data, error } = await supabase.from(name).update(updates as never).eq('id', params.id).eq('user_id', user.id).select().single();
     if (error) throw error;
-    if (name === 'tasks') { await syncParentProgress(supabase, user.id, previous); await syncParentProgress(supabase, user.id, data); }
+    if (name === 'tasks') {
+      await syncParentProgress(supabase, user.id, previous);
+      await syncParentProgress(supabase, user.id, data);
+      await createTaskMemory(supabase, user.id, data as Record<string, unknown>).catch((memoryError) => console.error('Could not create task memory:', memoryError));
+    }
     return NextResponse.json({ data });
   } catch (error) { return apiError(error); }
 }

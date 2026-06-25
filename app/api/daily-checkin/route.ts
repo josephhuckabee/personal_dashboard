@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/auth';
 import { apiError } from '@/lib/api';
 import { entitySchemas } from '@/lib/schemas';
+import { createCheckinMemories } from '@/lib/ai/memory';
 
 const average = (items: Array<Record<string, unknown>>, field: string) => items.length ? Number((items.reduce((sum, item) => sum + Number(item[field] || 0), 0) / items.length).toFixed(1)) : null;
 
@@ -33,6 +34,7 @@ export async function POST(request: Request) {
     const aiSummary = input.ai_summary || `Mood ${input.mood}/5, energy ${input.energy}/5, stress ${input.stress}/5, productivity ${input.productivity}/5. ${input.biggest_win ? `Win: ${input.biggest_win}` : 'No win recorded.'} ${input.tomorrow_priority ? `Tomorrow: ${input.tomorrow_priority}` : 'No tomorrow priority recorded.'}`;
     const { data, error } = await supabase.from('daily_checkins').upsert({ ...input, ai_summary: aiSummary, user_id: user.id } as never, { onConflict: 'user_id,checkin_date' }).select().single();
     if (error) throw error;
+    await createCheckinMemories(supabase, user.id, data as Record<string, unknown>).catch((memoryError) => console.error('Could not create check-in memories:', memoryError));
     return NextResponse.json({ data }, { status: 201 });
   } catch (error) { return apiError(error); }
 }

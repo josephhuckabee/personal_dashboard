@@ -32,6 +32,10 @@ export type Database = {
       ai_recommendations: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
       daily_checkins: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
       finance_categories: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
+      memories: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
+      memory_relationships: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
+      memory_events: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
+      weekly_reviews: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
     };
     Views: Record<string, never>;
     Functions: {

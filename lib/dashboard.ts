@@ -33,7 +33,7 @@ export async function getDashboardSnapshot(supabase: SupabaseClient<Database>, u
   const since30 = new Date(Date.now() - 30 * 86400000).toISOString();
   const since7 = new Date(Date.now() - 7 * 86400000).toISOString();
   const monthStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString().slice(0, 10);
-  const [profileResult, preferencesResult, goalsResult, objectivesResult, tasksResult, habitsResult, logsResult, accountsResult, transactionsResult, incomeResult, travelResult, contentResult, healthResult, checkinResult, briefingResult, decisionResult, contextResult] = await Promise.all([
+  const [profileResult, preferencesResult, goalsResult, objectivesResult, tasksResult, habitsResult, logsResult, accountsResult, transactionsResult, incomeResult, travelResult, contentResult, healthResult, checkinResult, briefingResult, decisionResult, contextResult, memoriesResult, reviewResult] = await Promise.all([
     supabase.from('profiles').select('*').eq('user_id', userId).single(),
     supabase.from('user_preferences').select('*').eq('user_id', userId).maybeSingle(),
     supabase.from('goals').select('*').eq('user_id', userId).order('created_at'),
@@ -51,8 +51,10 @@ export async function getDashboardSnapshot(supabase: SupabaseClient<Database>, u
     supabase.from('ai_briefings').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('ai_decisions').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('ai_context_profiles').select('*').eq('user_id', userId).maybeSingle(),
+    supabase.from('memories').select('*').eq('user_id', userId).is('inaccurate_at', null).order('importance_score', { ascending: false }).order('created_at', { ascending: false }).limit(40),
+    supabase.from('weekly_reviews').select('*').eq('user_id', userId).order('week_start', { ascending: false }).limit(1).maybeSingle(),
   ]);
-  const failures = [profileResult, preferencesResult, goalsResult, objectivesResult, tasksResult, habitsResult, logsResult, accountsResult, transactionsResult, incomeResult, travelResult, contentResult, healthResult, checkinResult, briefingResult, decisionResult, contextResult].filter((result) => result.error);
+  const failures = [profileResult, preferencesResult, goalsResult, objectivesResult, tasksResult, habitsResult, logsResult, accountsResult, transactionsResult, incomeResult, travelResult, contentResult, healthResult, checkinResult, briefingResult, decisionResult, contextResult, memoriesResult, reviewResult].filter((result) => result.error);
   if (failures.length) throw failures[0].error;
   const objectives = (objectivesResult.data || []) as Array<Record<string, unknown>>;
   const tasks = (tasksResult.data || []) as Array<Record<string, unknown>>;
@@ -100,6 +102,8 @@ export async function getDashboardSnapshot(supabase: SupabaseClient<Database>, u
     travel: travelResult.data || [], content: contentResult.data || [], health: healthResult.data || [], checkins: checkinResult.data || [],
     briefing: briefingResult.data,
     decision: decisionResult.data,
+    memories: memoriesResult.data || [],
+    weeklyReview: reviewResult.data,
     liveMetrics: { habitsDueToday: habitRows.length, habitsCompletedToday, tasksDueToday: tasksDueToday.length, overdueTasks: overdueTasks.length, upcomingTasks: upcomingTasks.slice(0, 10) },
     executionReadiness,
   };

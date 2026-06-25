@@ -34,12 +34,14 @@ export const receiptExtractionSchema = z.object({
 
 export const chiefOfStaffBriefingSchema = z.object({
   summary: z.string(),
-  current_risks: z.array(z.object({ title: z.string(), reason: z.string(), severity: z.enum(['low', 'medium', 'high']), recommended_action: z.string() })),
-  opportunities: z.array(z.object({ title: z.string(), reason: z.string(), category: z.enum(['income', 'travel', 'health', 'education', 'content', 'career']), recommended_action: z.string() })),
-  today_plan: z.array(z.object({ task: z.string(), priority: z.enum(['low', 'medium', 'high']), estimated_minutes: z.number().int().nonnegative() })),
-  finance_analysis: z.object({ current_cash: z.number().nullable(), monthly_burn: z.number().nullable(), runway_months: z.number().nullable(), warning: z.string().nullable() }),
+  top_priorities: z.array(z.object({ title: z.string(), reason: z.string(), category: z.string(), estimated_minutes: z.number().int().nonnegative() })),
+  risks: z.array(z.object({ title: z.string(), severity: z.enum(['low', 'medium', 'high']), reason: z.string(), recommended_action: z.string() })),
+  opportunities: z.array(z.object({ title: z.string(), impact: z.enum(['low', 'medium', 'high']), reason: z.string(), recommended_action: z.string() })),
+  recommended_focus: z.string(),
+  recommended_avoidance: z.string(),
   execution_readiness_score: z.number().int().min(0).max(100),
   chief_of_staff_note: z.string(),
+  memories_used: z.array(z.string()),
 });
 
 export const onboardingSchema = z.object({
@@ -67,5 +69,30 @@ export const chiefOfStaffDecisionSchema = z.object({
   chief_of_staff_note: z.string(),
 });
 
+export const memorySchema = z.object({
+  type: z.enum(['fact', 'preference', 'goal', 'decision', 'lesson', 'behavior', 'pattern', 'risk', 'opportunity', 'warning', 'milestone']).optional(),
+  title: z.string().trim().min(1).max(200).optional(),
+  content: z.string().trim().min(1).max(5000).optional(),
+  source: z.string().trim().max(80).optional(),
+  importance_score: z.coerce.number().min(0).max(100).optional(),
+  confidence_score: z.coerce.number().min(0).max(100).optional(),
+  is_important: z.preprocess((value) => value === true || value === 'true', z.boolean()).optional(),
+  inaccurate_at: dateString,
+});
+
+export const weeklyReviewSchema = z.object({
+  wins: z.array(z.string()),
+  losses: z.array(z.string()),
+  lessons: z.array(z.string()),
+  risks: z.array(z.string()),
+  opportunities: z.array(z.string()),
+  habit_analysis: z.string(),
+  finance_analysis: z.string(),
+  goal_progress: z.string(),
+  recommended_next_week_focus: z.string(),
+  memories_created: z.array(z.string()).default([]),
+});
+
 export type ChiefOfStaffBriefing = z.infer<typeof chiefOfStaffBriefingSchema>;
 export type ChiefOfStaffDecision = z.infer<typeof chiefOfStaffDecisionSchema>;
+export type WeeklyReview = z.infer<typeof weeklyReviewSchema>;
