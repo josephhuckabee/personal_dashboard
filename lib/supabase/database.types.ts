@@ -24,6 +24,12 @@ export type Database = {
       content_projects: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
       relationships: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
       health_metrics: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
+      health_profiles: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
+      medications: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
+      supplements: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
+      home_links: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
+      timeline_events: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
+      finance_integrations: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
       calendar_events: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
       ai_briefings: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
       ai_decisions: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
@@ -36,6 +42,9 @@ export type Database = {
       memory_relationships: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
       memory_events: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
       weekly_reviews: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
+      morning_briefings: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
+      executive_scores: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
+      decision_journal: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
     };
     Views: Record<string, never>;
     Functions: {

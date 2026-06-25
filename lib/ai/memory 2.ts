@@ -6,7 +6,6 @@ export type MemoryType = 'fact' | 'preference' | 'goal' | 'decision' | 'lesson' 
 
 type MemoryCandidate = {
   type: MemoryType;
-  category?: 'Identity' | 'Goals' | 'Health' | 'Career' | 'Finance' | 'Travel' | 'Relationships' | 'Preferences';
   title: string;
   content: string;
   source: string;
@@ -20,17 +19,6 @@ type MemoryCandidate = {
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, Math.round(value)));
 const normalize = (value: string) => value.trim().replace(/\s+/g, ' ');
 const isoDate = (date: Date) => date.toISOString().slice(0, 10);
-
-function categoryFor(candidate: MemoryCandidate) {
-  if (candidate.category) return candidate.category;
-  if (candidate.type === 'goal' || candidate.source.includes('task')) return 'Goals';
-  if (candidate.source.includes('finance') || candidate.title.toLowerCase().includes('expense')) return 'Finance';
-  if (candidate.source.includes('travel') || candidate.title.toLowerCase().includes('travel')) return 'Travel';
-  if (candidate.type === 'preference') return 'Preferences';
-  if (candidate.source.includes('checkin') || candidate.source.includes('habit')) return 'Health';
-  if (candidate.title.toLowerCase().includes('work') || candidate.title.toLowerCase().includes('career')) return 'Career';
-  return 'Identity';
-}
 
 async function insertMemory(supabase: SupabaseClient<Database>, userId: string, candidate: MemoryCandidate) {
   const title = normalize(candidate.title).slice(0, 200);
@@ -52,7 +40,6 @@ async function insertMemory(supabase: SupabaseClient<Database>, userId: string, 
       importance_score: clamp(Math.max(Number(existing.importance_score || 0), candidate.importance_score ?? 50)),
       confidence_score: clamp(Math.max(Number(existing.confidence_score || 0), candidate.confidence_score ?? 70)),
       is_important: (candidate.importance_score ?? 0) >= 80,
-      category: categoryFor(candidate),
       metadata: candidate.metadata || {},
     } as never).eq('id', existing.id).eq('user_id', userId).select().single();
     if (error) throw error;
@@ -68,7 +55,6 @@ async function insertMemory(supabase: SupabaseClient<Database>, userId: string, 
     importance_score: clamp(candidate.importance_score ?? 50),
     confidence_score: clamp(candidate.confidence_score ?? 70),
     is_important: (candidate.importance_score ?? 0) >= 80,
-    category: categoryFor(candidate),
     metadata: candidate.metadata || {},
   } as never).select().single();
   if (error) throw error;
@@ -165,9 +151,9 @@ export async function createFinanceMemory(supabase: SupabaseClient<Database>, us
 
 export async function getMemoryContext(supabase: SupabaseClient<Database>, userId: string) {
   const [latest, important, goalRelated] = await Promise.all([
-    supabase.from('memories').select('id,type,category,title,content,importance_score,confidence_score,source,created_at').eq('user_id', userId).is('inaccurate_at', null).is('archived_at', null).order('created_at', { ascending: false }).limit(20),
-    supabase.from('memories').select('id,type,category,title,content,importance_score,confidence_score,source,created_at').eq('user_id', userId).is('inaccurate_at', null).is('archived_at', null).order('importance_score', { ascending: false }).limit(20),
-    supabase.from('memories').select('id,type,category,title,content,importance_score,confidence_score,source,created_at').eq('user_id', userId).is('inaccurate_at', null).is('archived_at', null).in('type', ['goal', 'pattern', 'risk', 'lesson']).order('updated_at', { ascending: false }).limit(20),
+    supabase.from('memories').select('id,type,title,content,importance_score,confidence_score,source,created_at').eq('user_id', userId).is('inaccurate_at', null).order('created_at', { ascending: false }).limit(20),
+    supabase.from('memories').select('id,type,title,content,importance_score,confidence_score,source,created_at').eq('user_id', userId).is('inaccurate_at', null).order('importance_score', { ascending: false }).limit(20),
+    supabase.from('memories').select('id,type,title,content,importance_score,confidence_score,source,created_at').eq('user_id', userId).is('inaccurate_at', null).in('type', ['goal', 'pattern', 'risk', 'lesson']).order('updated_at', { ascending: false }).limit(20),
   ]);
   const failures = [latest, important, goalRelated].filter((result) => result.error);
   if (failures.length) throw failures[0].error;
@@ -184,7 +170,6 @@ export async function getMemoryContext(supabase: SupabaseClient<Database>, userI
     compact: memories.map((memory) => ({
       id: memory.id,
       type: memory.type,
-      category: memory.category,
       title: memory.title,
       content: memory.content,
       importance: memory.importance_score,
@@ -228,7 +213,6 @@ export function summarizeWeek(snapshot: Awaited<ReturnType<typeof getDashboardSn
     missed_tasks: missedTasks.map((task) => task.title).slice(0, 12),
     habits: habits.map((habit) => ({ name: habit.name, streak: habit.streak, weekly_consistency: habit.weeklyConsistency })),
     finance: { current_cash: snapshot.finance.currentCash, monthly_burn: snapshot.finance.monthlyBurn, runway_months: snapshot.finance.runwayMonths, risk_score: snapshot.finance.financialRiskScore },
-    travel: snapshot.travel.map((item) => ({ title: item.title, city: item.city, country: item.country, arrival_at: item.arrival_at, departure_at: item.departure_at, visa_deadline: item.visa_deadline, status: item.status })),
     checkins: snapshot.checkins.map((item) => ({ date: item.checkin_date, mood: item.mood, energy: item.energy, stress: item.stress, productivity: item.productivity, avoided: item.what_was_avoided, win: item.biggest_win, challenge: item.biggest_challenge })),
     health: snapshot.health.slice(0, 20),
   };

@@ -9,13 +9,9 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const q = url.searchParams.get('q')?.trim().toLowerCase() || '';
     const type = url.searchParams.get('type');
-    const category = url.searchParams.get('category');
-    const includeArchived = url.searchParams.get('archived') === 'true';
     const limit = Math.min(Number(url.searchParams.get('limit') || 100), 250);
     let query = supabase.from('memories').select('*').eq('user_id', user.id).order('importance_score', { ascending: false }).order('created_at', { ascending: false }).limit(limit);
     if (type) query = query.eq('type', type);
-    if (category) query = query.eq('category', category);
-    if (!includeArchived) query = query.is('archived_at', null);
     const { data, error } = await query;
     if (error) throw error;
     const filtered = q ? (data || []).filter((memory) => [memory.title, memory.content, memory.source, memory.type].some((value) => String(value || '').toLowerCase().includes(q))) : (data || []);
@@ -31,7 +27,6 @@ export async function POST(request: Request) {
       ...input,
       user_id: user.id,
       source: input.source || 'user',
-      category: input.category || 'Identity',
       importance_score: input.importance_score ?? 70,
       confidence_score: input.confidence_score ?? 100,
       is_important: input.is_important ?? Number(input.importance_score ?? 70) >= 80,

@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   try {
     const { user, supabase } = await requireUser();
     const input = entitySchemas.daily_checkins.parse(await request.json());
-    const aiSummary = input.ai_summary || `Mood ${input.mood}/5, energy ${input.energy}/5, stress ${input.stress}/5, productivity ${input.productivity}/5. ${input.biggest_win ? `Win: ${input.biggest_win}` : 'No win recorded.'} ${input.tomorrow_priority ? `Tomorrow: ${input.tomorrow_priority}` : 'No tomorrow priority recorded.'}`;
+    const aiSummary = input.ai_summary || `Mood ${input.mood}/10, energy ${input.energy}/10, stress ${input.stress}/10, productivity ${input.productivity}/10. ${input.biggest_win ? `Win: ${input.biggest_win}` : 'No win recorded.'} ${input.tomorrow_priority ? `Tomorrow: ${input.tomorrow_priority}` : 'No tomorrow priority recorded.'}`;
     const { data, error } = await supabase.from('daily_checkins').upsert({ ...input, ai_summary: aiSummary, user_id: user.id } as never, { onConflict: 'user_id,checkin_date' }).select().single();
     if (error) throw error;
     await createCheckinMemories(supabase, user.id, data as Record<string, unknown>).catch((memoryError) => console.error('Could not create check-in memories:', memoryError));

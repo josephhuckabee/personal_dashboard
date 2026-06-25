@@ -8,7 +8,8 @@ export async function GET() {
     const { user, supabase } = await requireUser();
     const { data, error } = await supabase.from('health_metrics').select('*').eq('user_id', user.id).order('recorded_at', { ascending: false }).limit(180);
     if (error) throw error;
-    const latest = Object.fromEntries(['weight','workout','running','yoga','meditation','sleep','calories','protein'].map((type) => [type, (data || []).find((item) => item.metric_type === type) || null]));
+    const metricTypes = ['weight','body_fat','waist','neck','workout','strength','running','walking','yoga','mobility','meditation','sleep','energy','stress','mood','calories','protein','water'];
+    const latest = Object.fromEntries(metricTypes.map((type) => [type, (data || []).find((item) => item.metric_type === type) || null]));
     const last30 = (data || []).filter((item) => new Date(String(item.recorded_at)) >= new Date(Date.now() - 30 * 86400000));
     const counts = last30.reduce<Record<string, number>>((result, item) => { const type = String(item.metric_type); result[type] = (result[type] || 0) + 1; return result; }, {});
     return NextResponse.json({ data, latest, counts });

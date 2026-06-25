@@ -391,3 +391,65 @@ body { background: #05080c; }
 .toast { min-width: 220px; display: flex; align-items: center; gap: 9px; padding: 12px 14px; border: 1px solid var(--line-strong); border-radius: 12px; color: var(--text); background: rgba(16,18,20,.96); box-shadow: 0 18px 55px rgba(0,0,0,.35); font-size: 13px; font-weight: 700; }
 .toast-success svg { color: var(--mint); }
 .toast-error svg { color: var(--rose); }
+
+/* Phase 6 readability pass: preserve layout, improve long-session legibility. */
+:root {
+  --muted: #b8c2d1;
+  --muted-2: #8f9bad;
+  --line: rgba(255,255,255,.16);
+  --line-strong: rgba(255,255,255,.26);
+}
+body { font-size: 16px; line-height: 1.6; }
+button, input, textarea, select { font-size: 13px; }
+.page-content { padding-top: 48px; }
+.page-header { margin-bottom: 36px; }
+.page-copy { max-width: 760px; font-size: 15px; line-height: 1.75; color: var(--muted); }
+.side-nav { gap: 5px; }
+.side-nav button { padding: 11px 12px; }
+.side-nav button span { font-size: 13px; line-height: 1.3; }
+.brand strong { font-size: 16px; }
+.brand small, .profile-row small, .journey-card > span { font-size: 11px; color: var(--muted); }
+.journey-card strong, .profile-row strong { font-size: 13px; }
+.section-title h2 { font-size: 18px; line-height: 1.25; }
+.section-title p { font-size: 12px; line-height: 1.5; color: var(--muted); }
+.metric-card, .goal-card, .behavior-insight, .learning-timeline-card, .relationship-card, .transactions-card, .executive-signal-card, .assistant-side > .card, .chief-report-grid > .card, .settings-grid > .card, .school-grid > .card, .wellbeing-form-card, .gratitude-card { padding: 24px; }
+.metric-grid { gap: 14px; margin-bottom: 16px; }
+.metric-card { min-height: 146px; }
+.metric-label { font-size: 10px; color: var(--muted); }
+.metric-value { max-width: calc(100% - 42px); overflow-wrap: anywhere; font-size: 30px; line-height: 1.05; }
+.metric-detail, .metric-trend { font-size: 11px; line-height: 1.45; color: var(--muted); }
+.pill { min-height: 24px; padding-inline: 10px; font-size: 9px; }
+.primary-button { min-height: 42px; font-size: 12px; }
+.subtle-button { min-height: 40px; font-size: 12px; }
+.text-button { font-size: 12px; }
+.signal-list b, .transaction-list strong, .relationship-list strong, .course-list strong, .school-task-list strong, .studio-checklist strong, .plan-list strong, .roi-actions strong, .habit-mini-list strong { font-size: 12px; line-height: 1.35; }
+.signal-list span, .transaction-list small, .relationship-list small, .relationship-list p, .school-task-list small, .studio-checklist small, .behavior-insight > p, .assistant-copy p, .chief-report-grid p, .plan-empty { font-size: 11px; line-height: 1.6; color: var(--muted); }
+.homebase-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-bottom: 14px; }
+.homebase-grid > .card { min-height: 300px; padding: 24px; }
+.planning-help-card { margin-bottom: 14px; padding: 20px 24px; }
+.timeline-overview { grid-template-columns: minmax(180px, 1fr) minmax(160px, .6fr) auto; min-height: 86px; }
+.timeline-overview input, .timeline-overview select { min-height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--text); background: rgba(0,0,0,.22); }
+.wellbeing-form label { font-size: 11px; }
+.wellbeing-form input, .wellbeing-form select, .wellbeing-form textarea, .studio-add-form input, .studio-add-form select, .studio-add-form textarea { font-size: 12px; }
+.school-task-list > div { min-height: 58px; border-top: 1px solid var(--line); display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 8px; }
+.school-task-list > div > button:first-child { border-top: 0; }
+.school-task-list > div.done { opacity: .68; }
+
+@media (max-width: 820px) {
+  .page-content { padding: 34px 18px 96px; }
+  .page-copy { font-size: 14px; }
+  .metric-value { font-size: 27px; }
+  .homebase-grid { grid-template-columns: 1fr; }
+  .timeline-overview { grid-template-columns: 1fr; padding: 18px; }
+  .bottom-nav button { font-size: 9px; }
+}
+
+@media (max-width: 560px) {
+  .page-content { padding-inline: 16px; }
+  .card, .metric-card, .goal-card, .behavior-insight, .learning-timeline-card, .relationship-card, .transactions-card, .executive-signal-card { padding: 20px; }
+  .metric-grid, .score-grid, .goals-grid { grid-template-columns: 1fr; }
+  .metric-card { min-height: 132px; }
+  .metric-value { font-size: 25px; }
+  .section-title h2 { font-size: 17px; }
+  .mobile-more-grid button { font-size: 10px; }
+}

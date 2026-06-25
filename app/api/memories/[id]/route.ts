@@ -14,6 +14,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       ? { is_important: true, importance_score: 95 }
       : action === 'inaccurate'
         ? { inaccurate_at: new Date().toISOString(), confidence_score: 0 }
+        : action === 'archive'
+          ? { archived_at: new Date().toISOString() }
         : input;
     const { data, error } = await supabase.from('memories').update(updates as never).eq('id', params.id).eq('user_id', user.id).select().single();
     if (error) throw error;

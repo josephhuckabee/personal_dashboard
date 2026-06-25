@@ -10,12 +10,25 @@ export function buildLocalChiefOfStaffSummary(snapshot: Awaited<ReturnType<typeo
   const goalsAtRisk = (snapshot.objectives as Array<Record<string, unknown> & { calculated_status: string }>).filter((goal) => goal.calculated_status === 'at_risk');
   const highPriority = open.filter((task) => task.priority === 'high').sort((a, b) => Number(Boolean(a.due_at)) - Number(Boolean(b.due_at)))[0];
   const focusTask = overdueTasks[0] || highPriority || open[0];
+  const highestRiskObjective = goalsAtRisk.sort((a, b) => {
+    const priorityWeight = { high: 3, medium: 2, low: 1 };
+    return (priorityWeight[String(b.priority) as 'high' | 'medium' | 'low'] || 0) - (priorityWeight[String(a.priority) as 'high' | 'medium' | 'low'] || 0);
+  })[0] || null;
+  const financialWarning = snapshot.finance.monthlyBurn === 0
+    ? 'Spending data is missing; runway cannot be calculated reliably.'
+    : snapshot.finance.runwayMonths !== null && snapshot.finance.runwayMonths < 3
+      ? 'Financial runway is under three months based on current cash and recorded burn.'
+      : snapshot.finance.financialRiskScore >= 70
+        ? 'Financial risk is elevated based on cash, income, and spending.'
+        : null;
   return {
     weakest_habit: habits[0] ? { id: habits[0].id, name: habits[0].name, consistency: habits[0].weeklyConsistency } : null,
     strongest_habit: habits.at(-1) ? { id: habits.at(-1)?.id, name: habits.at(-1)?.name, consistency: habits.at(-1)?.weeklyConsistency } : null,
+    highest_risk_objective: highestRiskObjective ? { id: highestRiskObjective.id, title: highestRiskObjective.title, progress: highestRiskObjective.progress, priority: highestRiskObjective.priority || 'medium' } : null,
     overdue_tasks: overdueTasks.map((task) => ({ id: task.id, title: task.title, due_at: task.due_at, priority: task.priority })),
     goals_at_risk: goalsAtRisk.map((goal) => ({ id: goal.id, title: goal.title, progress: goal.progress })),
-    finance_risk: { score: snapshot.finance.financialRiskScore, runway_months: snapshot.finance.runwayMonths, current_cash: snapshot.finance.currentCash },
+    finance_risk: { score: snapshot.finance.financialRiskScore, runway_months: snapshot.finance.runwayMonths, current_cash: snapshot.finance.currentCash, monthly_burn: snapshot.finance.monthlyBurn, warning: financialWarning },
+    financial_warning: financialWarning,
     today_best_focus: focusTask ? `Complete ${String(focusTask.title)}.` : habits[0] ? `Protect today’s ${String(habits[0].name)} habit.` : 'Define one concrete priority for today.',
     recommended_avoidance: overdueTasks.length ? 'Avoid adding new goals before completing today’s existing overdue work.' : 'Avoid adding new commitments before completing the current highest-priority task.',
   };
