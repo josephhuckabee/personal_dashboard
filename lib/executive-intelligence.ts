@@ -25,6 +25,8 @@ export function buildExecutiveIntelligence(snapshot: Snapshot) {
   const habits = snapshot.habits as Array<Record<string, unknown> & { weeklyConsistency: number; monthlyConsistency: number; streak: number }>;
   const checkins = snapshot.checkins as Array<Record<string, unknown>>;
   const travel = snapshot.travel as Array<Record<string, unknown>>;
+  const journal = (snapshot.journal || []) as Array<Record<string, unknown>>;
+  const benchmarks = (snapshot.benchmarks || []) as Array<Record<string, unknown>>;
   const openTasks = tasks.filter((task) => !['completed', 'cancelled'].includes(String(task.status)));
   const overdueTasks = local.overdue_tasks || [];
   const latestCheckin = checkins[0] || null;
@@ -63,6 +65,7 @@ export function buildExecutiveIntelligence(snapshot: Snapshot) {
     : watchObjectives[0]?.title
       ? `${String(watchObjectives[0].title)} can be stabilized with one logged action`
       : 'More data will expose stronger opportunity patterns.';
+  const latestJournalTheme = Array.isArray(journal[0]?.themes) ? (journal[0].themes as unknown[]).join(', ') : '';
 
   const warnings = [
     ...overdueTasks.map((task) => ({ title: `Overdue: ${task.title}`, level: 'high', citation: citation('tasks', 'due_at', task.due_at) })),
@@ -94,6 +97,8 @@ export function buildExecutiveIntelligence(snapshot: Snapshot) {
     citation('finance', 'runway_months', snapshot.finance.runwayMonths),
     citation('habits', 'habit_health', habitHealth),
     citation('daily_checkins', 'latest_checkin', latestCheckin ? { date: latestCheckin.checkin_date, mood: latestCheckin.mood, energy: latestCheckin.energy, stress: latestCheckin.stress, productivity: latestCheckin.productivity } : null),
+    citation('journal_entries', 'latest_themes', latestJournalTheme || null),
+    citation('life_benchmarks', 'active_benchmarks', benchmarks.length),
     citation('travel_plans', 'active_location', activeTravel ? { city: activeTravel.city, country: activeTravel.country } : null),
   ];
 

@@ -30,7 +30,7 @@ export default function LoginPage() {
         <span className="brand-mark">Y</span>
         <p className="eyebrow">You OS</p>
         <h1>{mode === 'signup' ? 'Build your operating system' : 'Enter your operating system'}<span className="title-dot">.</span></h1>
-        <p className="page-copy">Your goals, finances, health, travel, and decisions remain private and user-scoped.</p>
+        <p className="page-copy">Your journal, finances, health, travel, and memories remain private and user-scoped.</p>
         <div className="accountability-options"><button className={mode === 'signin' ? 'active' : ''} onClick={() => setMode('signin')}>Sign in</button><button className={mode === 'signup' ? 'active' : ''} onClick={() => setMode('signup')}>Create account</button></div>
         <form onSubmit={submit} className="auth-form">
           {mode === 'signup' && <label>Preferred name<input value={preferredName} onChange={(event) => setPreferredName(event.target.value)} required /></label>}

@@ -6,6 +6,7 @@ import type { Database } from '@/lib/supabase/database.types';
 import type { Json } from '@/lib/supabase/database.types';
 import { ZodError } from 'zod';
 import { createOnboardingMemories } from '@/lib/ai/memory';
+import { generateAdaptivePlanForUser } from '@/lib/adaptive-plan';
 
 const FRIENDLY_ERROR = "We couldn't save your setup yet. Please try again in a moment.";
 
@@ -35,6 +36,11 @@ async function persistStep<T>(name: string, userId: string, action: () => Promis
 async function completeOnboardingDirect(supabase: SupabaseClient<Database>, userId: string, input: OnboardingInput) {
   const location = input.location || null;
   const currency = input.finances.currency;
+  const height = Number(input.health_baseline.height || 0);
+  const weight = Number(input.health_baseline.weight || 0);
+  const bmi = height && weight ? Number((weight * 703 / (height * height)).toFixed(1)) : null;
+  const genderAdjustment = String(input.health_baseline.gender || '').toLowerCase().startsWith('m') ? -16.2 : -5.4;
+  const estimatedBodyFat = bmi && input.age ? Number((1.2 * bmi + 0.23 * input.age + genderAdjustment).toFixed(1)) : null;
 
   const legacyUser = await supabase.from('users').upsert({
     id: userId,
@@ -52,11 +58,27 @@ async function completeOnboardingDirect(supabase: SupabaseClient<Database>, user
   await persistStep('profiles upsert', userId, () => supabase.from('profiles').upsert({
     user_id: userId,
     preferred_name: input.preferred_name,
+    age: input.age || null,
     location,
     current_city: location,
     timezone: input.timezone,
+    passport_country: input.travel_profile?.passport_country || null,
     one_year_vision: input.one_year_vision,
     work_style: input.work_style,
+    adaptive_profile: {
+      year_success: input.year_success || null,
+      biggest_concerns: input.biggest_concerns || null,
+      biggest_opportunities: input.biggest_opportunities || null,
+      ideal_life: {
+        '90_days': input.ideal_life_90_days || null,
+        '1_year': input.ideal_life_1_year || null,
+        '2_years': input.ideal_life_2_years || null,
+        '5_years': input.ideal_life_5_years || null,
+        '10_years': input.ideal_life_10_years || null,
+      },
+      travel_profile: input.travel_profile || {},
+      education_profile: input.education_profile || {},
+    } as Json,
     onboarding_completed: false,
   } as never, { onConflict: 'user_id' }));
 
@@ -70,22 +92,6 @@ async function completeOnboardingDirect(supabase: SupabaseClient<Database>, user
     chief_of_staff_tone: input.chief_of_staff_tone,
     design_preferences: input.design as unknown as Json,
   } as never, { onConflict: 'user_id' }));
-
-  const goalRows = input.goals.map((goal) => ({
-    user_id: userId,
-    title: goal.title,
-    category: goal.category || 'personal',
-    target_date: goal.target_date || null,
-  }));
-  if (goalRows.length) {
-    await persistStep('goals insert', userId, () => supabase.from('goals').insert(goalRows as never));
-    await persistStep('objectives insert', userId, () => supabase.from('objectives').insert(goalRows.map((goal) => ({
-      user_id: userId,
-      title: goal.title,
-      category: goal.category,
-      deadline: goal.target_date,
-    })) as never));
-  }
 
   if (input.habits.length) {
     await persistStep('habits insert', userId, () => supabase.from('habits').insert(input.habits.map((habit) => ({
@@ -140,6 +146,21 @@ async function completeOnboardingDirect(supabase: SupabaseClient<Database>, user
   ].filter(Boolean);
   if (healthRows.length) await persistStep('health metrics insert', userId, () => supabase.from('health_metrics').insert(healthRows as never));
 
+  await persistStep('health profile upsert', userId, () => supabase.from('health_profiles').upsert({
+    user_id: userId,
+    age: input.age || null,
+    gender: input.health_baseline.gender || null,
+    height: input.health_baseline.height || null,
+    weight: input.health_baseline.weight || null,
+    goal_weight: input.health_baseline.goal_weight || null,
+    activity_level: input.health_baseline.activity_level || null,
+    sleep_target: input.health_baseline.sleep_target || input.health_baseline.average_sleep_hours || null,
+    dietary_restrictions: input.health_baseline.dietary_restrictions || null,
+    bmi,
+    estimated_body_fat_pct: estimatedBodyFat,
+    diet_profile: input.health_baseline.diet_style || 'Custom',
+  } as never, { onConflict: 'user_id' }));
+
   await persistStep('ai context upsert', userId, () => supabase.from('ai_context_profiles').upsert({
     user_id: userId,
     life_vision: input.one_year_vision,
@@ -147,7 +168,7 @@ async function completeOnboardingDirect(supabase: SupabaseClient<Database>, user
     health_baseline: input.health_baseline as unknown as Json,
     finance_baseline: input.finances as unknown as Json,
     onboarding_snapshot: input as unknown as Json,
-    context_summary: `Preferred name: ${input.preferred_name}. One-year vision: ${input.one_year_vision}. Work style: ${input.work_style}`,
+    context_summary: `Preferred name: ${input.preferred_name}. One-year vision: ${input.one_year_vision}. Successful year: ${input.year_success || 'not specified'}. Concerns: ${input.biggest_concerns || 'not specified'}. Opportunities: ${input.biggest_opportunities || 'not specified'}. Work style: ${input.work_style}`,
   } as never, { onConflict: 'user_id' }));
 
   await persistStep('finance categories insert', userId, () => supabase.from('finance_categories').upsert([
@@ -156,6 +177,7 @@ async function completeOnboardingDirect(supabase: SupabaseClient<Database>, user
     ].map(([name, category_type]) => ({ user_id: userId, name, category_type })) as never, { onConflict: 'user_id,name,category_type', ignoreDuplicates: true }));
 
   await persistStep('profiles completion update', userId, () => supabase.from('profiles').update({ onboarding_completed: true } as never).eq('user_id', userId));
+  await generateAdaptivePlanForUser(supabase, userId);
   const legacyCompletion = await supabase.from('users').update({ onboarding_completed: true } as never).eq('id', userId);
   if (legacyCompletion.error && !isMissingTable(legacyCompletion.error)) {
     logOnboardingError('legacy users completion update failed', { userId, error: legacyCompletion.error });
@@ -215,7 +237,7 @@ export async function POST(request: Request) {
       supabase.from('habits').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
     ]);
     const verificationErrors = [profileError, preferencesError, goalsError, habitsError].filter(Boolean);
-    const verificationFailed = verificationErrors.length > 0 || !profile?.onboarding_completed || !preferences || (goalCount ?? 0) < input.goals.length || (habitCount ?? 0) < input.habits.length;
+    const verificationFailed = verificationErrors.length > 0 || !profile?.onboarding_completed || !preferences || (goalCount ?? 0) < 1 || (habitCount ?? 0) < input.habits.length;
 
     if (verificationFailed) {
       logOnboardingError('post-submit verification failed', {
@@ -223,7 +245,7 @@ export async function POST(request: Request) {
         profile,
         hasPreferences: Boolean(preferences),
         goalCount,
-        expectedGoalCount: input.goals.length,
+        expectedGoalCount: 'generated adaptive milestones',
         habitCount,
         expectedHabitCount: input.habits.length,
         verificationErrors,

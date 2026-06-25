@@ -45,6 +45,9 @@ export type Database = {
       morning_briefings: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
       executive_scores: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
       decision_journal: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
+      life_benchmarks: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
+      journal_entries: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
+      adaptive_insights: { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
     };
     Views: Record<string, never>;
     Functions: {

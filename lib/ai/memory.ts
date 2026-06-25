@@ -6,7 +6,7 @@ export type MemoryType = 'fact' | 'preference' | 'goal' | 'decision' | 'lesson' 
 
 type MemoryCandidate = {
   type: MemoryType;
-  category?: 'Identity' | 'Goals' | 'Health' | 'Career' | 'Finance' | 'Travel' | 'Relationships' | 'Preferences';
+  category?: 'Identity' | 'Health' | 'Travel' | 'Career' | 'Education' | 'Finance' | 'Relationships' | 'Values' | 'Preferences' | 'Goals';
   title: string;
   content: string;
   source: string;
@@ -24,6 +24,8 @@ const isoDate = (date: Date) => date.toISOString().slice(0, 10);
 function categoryFor(candidate: MemoryCandidate) {
   if (candidate.category) return candidate.category;
   if (candidate.type === 'goal' || candidate.source.includes('task')) return 'Goals';
+  if (candidate.source.includes('journal') && /value|important|matter|believe|principle/i.test(candidate.content)) return 'Values';
+  if (/school|wgu|course|degree|certification|education/i.test(candidate.content)) return 'Education';
   if (candidate.source.includes('finance') || candidate.title.toLowerCase().includes('expense')) return 'Finance';
   if (candidate.source.includes('travel') || candidate.title.toLowerCase().includes('travel')) return 'Travel';
   if (candidate.type === 'preference') return 'Preferences';
@@ -105,18 +107,38 @@ export async function createMemoriesFromCandidates(supabase: SupabaseClient<Data
 
 export async function createOnboardingMemories(supabase: SupabaseClient<Database>, userId: string, input: {
   preferred_name: string;
+  age?: number | null;
   one_year_vision: string;
+  year_success?: string | null;
+  biggest_concerns?: string | null;
+  biggest_opportunities?: string | null;
+  ideal_life_90_days?: string | null;
+  ideal_life_1_year?: string | null;
+  ideal_life_2_years?: string | null;
+  ideal_life_5_years?: string | null;
+  ideal_life_10_years?: string | null;
   work_style: string;
   chief_of_staff_tone: string;
   goals: Array<{ title: string; category?: string; target_date?: string | null }>;
   habits: Array<{ name: string; target_per_week?: number }>;
   finances: { current_cash: number; monthly_income?: number; currency: string };
   travel_plans: Array<{ title: string; city?: string; country?: string; arrival_at?: string | null }>;
+  travel_profile?: Record<string, unknown>;
+  education_profile?: Record<string, unknown>;
+  health_baseline?: Record<string, unknown>;
 }) {
   const candidates: MemoryCandidate[] = [
-    { type: 'fact', title: 'User one-year vision', content: input.one_year_vision, source: 'onboarding', importance_score: 92, confidence_score: 95 },
+    { type: 'fact', category: 'Identity', title: 'User identity baseline', content: `${input.preferred_name}${input.age ? ` is ${input.age}` : ''}.`, source: 'onboarding', importance_score: 70, confidence_score: 95 },
+    { type: 'fact', category: 'Values', title: 'User one-year vision', content: input.one_year_vision, source: 'onboarding', importance_score: 92, confidence_score: 95 },
+    ...(input.year_success ? [{ type: 'goal' as const, category: 'Values' as const, title: 'Definition of a successful year', content: input.year_success, source: 'onboarding', importance_score: 90, confidence_score: 92 }] : []),
+    ...(input.biggest_concerns ? [{ type: 'risk' as const, category: 'Values' as const, title: 'Current biggest concerns', content: input.biggest_concerns, source: 'onboarding', importance_score: 84, confidence_score: 90 }] : []),
+    ...(input.biggest_opportunities ? [{ type: 'opportunity' as const, category: 'Values' as const, title: 'Current biggest opportunities', content: input.biggest_opportunities, source: 'onboarding', importance_score: 82, confidence_score: 90 }] : []),
+    ...(['ideal_life_90_days','ideal_life_1_year','ideal_life_2_years','ideal_life_5_years','ideal_life_10_years'] as const).filter((key) => input[key]).map((key) => ({ type: 'goal' as const, category: 'Values' as const, title: `Ideal life ${key.replace('ideal_life_', '').replaceAll('_', ' ')}`, content: String(input[key]), source: 'onboarding', importance_score: 80, confidence_score: 88 })),
     { type: 'preference', title: 'Preferred recommendation style', content: `User prefers ${input.chief_of_staff_tone} Chief of Staff recommendations. Work style: ${input.work_style}`, source: 'onboarding', importance_score: 85, confidence_score: 95 },
     { type: 'fact', title: 'Finance baseline', content: `Starting cash is ${input.finances.currency} ${input.finances.current_cash}. Monthly income baseline is ${input.finances.monthly_income || 0}.`, source: 'onboarding', importance_score: 70, confidence_score: 90 },
+    ...(input.health_baseline ? [{ type: 'fact' as const, category: 'Health' as const, title: 'Health baseline', content: JSON.stringify(input.health_baseline), source: 'onboarding', importance_score: 72, confidence_score: 86 }] : []),
+    ...(input.travel_profile ? [{ type: 'preference' as const, category: 'Travel' as const, title: 'Travel profile', content: JSON.stringify(input.travel_profile), source: 'onboarding', importance_score: 72, confidence_score: 86 }] : []),
+    ...(input.education_profile ? [{ type: 'fact' as const, category: 'Education' as const, title: 'Education and career profile', content: JSON.stringify(input.education_profile), source: 'onboarding', importance_score: 76, confidence_score: 86 }] : []),
     ...input.goals.map((goal) => ({ type: 'goal' as const, title: `Stated goal: ${goal.title}`, content: `User stated this goal during onboarding. Category: ${goal.category || 'personal'}. Target date: ${goal.target_date || 'not recorded'}.`, source: 'onboarding', importance_score: 88, confidence_score: 95 })),
     ...input.habits.map((habit) => ({ type: 'behavior' as const, title: `Intended habit: ${habit.name}`, content: `User wants to track ${habit.name} ${habit.target_per_week || 7} times per week.`, source: 'onboarding', importance_score: 58, confidence_score: 90 })),
     ...input.travel_plans.map((plan) => ({ type: 'milestone' as const, title: `Travel plan: ${plan.title}`, content: `Travel plan recorded for ${[plan.city, plan.country].filter(Boolean).join(', ') || 'location not recorded'}${plan.arrival_at ? ` arriving ${plan.arrival_at}` : ''}.`, source: 'onboarding', importance_score: 65, confidence_score: 90 })),
@@ -130,8 +152,35 @@ export async function createCheckinMemories(supabase: SupabaseClient<Database>, 
   const avoided = String(checkin.what_was_avoided || '').trim();
   const win = String(checkin.biggest_win || '').trim();
   if (avoided.length >= 20) candidates.push({ type: 'behavior', title: `Avoidance noted ${checkin.checkin_date}`, content: `User reported avoiding: ${avoided}`, source: 'daily_checkin', importance_score: 62, confidence_score: 88, related_entity_type: 'daily_checkins', related_entity_id: String(checkin.id || '') });
-  if (challenge.length >= 24 || Number(checkin.stress || 0) >= 4) candidates.push({ type: 'risk', title: `Execution friction ${checkin.checkin_date}`, content: `Stress ${checkin.stress}/5. Challenge: ${challenge || 'not specified'}.`, source: 'daily_checkin', importance_score: Number(checkin.stress || 0) >= 4 ? 72 : 58, confidence_score: 85, related_entity_type: 'daily_checkins', related_entity_id: String(checkin.id || '') });
-  if (win.length >= 24 && Number(checkin.productivity || 0) >= 4) candidates.push({ type: 'lesson', title: `Productive day evidence ${checkin.checkin_date}`, content: `Productivity ${checkin.productivity}/5. Win: ${win}`, source: 'daily_checkin', importance_score: 55, confidence_score: 82, related_entity_type: 'daily_checkins', related_entity_id: String(checkin.id || '') });
+  if (challenge.length >= 24 || Number(checkin.stress || 0) >= 8) candidates.push({ type: 'risk', title: `Execution friction ${checkin.checkin_date}`, content: `Stress ${checkin.stress}/10. Challenge: ${challenge || 'not specified'}.`, source: 'daily_checkin', importance_score: Number(checkin.stress || 0) >= 8 ? 72 : 58, confidence_score: 85, related_entity_type: 'daily_checkins', related_entity_id: String(checkin.id || '') });
+  if (win.length >= 24 && Number(checkin.productivity || 0) >= 8) candidates.push({ type: 'lesson', title: `Productive day evidence ${checkin.checkin_date}`, content: `Productivity ${checkin.productivity}/10. Win: ${win}`, source: 'daily_checkin', importance_score: 55, confidence_score: 82, related_entity_type: 'daily_checkins', related_entity_id: String(checkin.id || '') });
+  return createMemoriesFromCandidates(supabase, userId, candidates);
+}
+
+export async function createJournalMemories(supabase: SupabaseClient<Database>, userId: string, entry: Record<string, unknown>) {
+  const body = String(entry.body || '').trim();
+  if (body.length < 20) return [];
+  const lower = body.toLowerCase();
+  const candidates: MemoryCandidate[] = [];
+  const titleDate = String(entry.entry_date || isoDate(new Date()));
+  if (/worried|concern|afraid|risk|stuck|behind|stress|problem/.test(lower)) {
+    candidates.push({ type: 'risk', category: 'Values', title: `Journal concern ${titleDate}`, content: body.slice(0, 1000), source: 'journal', importance_score: 72, confidence_score: 74, related_entity_type: 'journal_entries', related_entity_id: String(entry.id || '') });
+  }
+  if (/want|trying|motivat|goal|dream|ideal|future|become/.test(lower)) {
+    candidates.push({ type: 'goal', category: 'Values', title: `Journal motivation ${titleDate}`, content: body.slice(0, 1000), source: 'journal', importance_score: 76, confidence_score: 74, related_entity_type: 'journal_entries', related_entity_id: String(entry.id || '') });
+  }
+  if (/value|matter|important|principle|identity|person i want/.test(lower)) {
+    candidates.push({ type: 'fact', category: 'Values', title: `Stated value ${titleDate}`, content: body.slice(0, 1000), source: 'journal', importance_score: 82, confidence_score: 72, related_entity_type: 'journal_entries', related_entity_id: String(entry.id || '') });
+  }
+  if (/friend|family|partner|relationship|mother|father|client|team|mentor/.test(lower)) {
+    candidates.push({ type: 'fact', category: 'Relationships', title: `Relationship context ${titleDate}`, content: body.slice(0, 1000), source: 'journal', importance_score: 62, confidence_score: 68, related_entity_type: 'journal_entries', related_entity_id: String(entry.id || '') });
+  }
+  if (/win|worked|progress|finished|completed|proud/.test(lower)) {
+    candidates.push({ type: 'lesson', title: `Journal win ${titleDate}`, content: body.slice(0, 1000), source: 'journal', importance_score: 60, confidence_score: 72, related_entity_type: 'journal_entries', related_entity_id: String(entry.id || '') });
+  }
+  if (/failed|missed|avoided|didn't|did not|slipped/.test(lower)) {
+    candidates.push({ type: 'lesson', title: `Journal failure pattern ${titleDate}`, content: body.slice(0, 1000), source: 'journal', importance_score: 68, confidence_score: 72, related_entity_type: 'journal_entries', related_entity_id: String(entry.id || '') });
+  }
   return createMemoriesFromCandidates(supabase, userId, candidates);
 }
 
